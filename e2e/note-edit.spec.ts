@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { test, expect } from "@playwright/test";
 
 const fixturePath = path.resolve(process.cwd(), "test-vault/inbox/welcome.md");
-let originalContent = "";
+let originalContent: string | null = null;
 
 test.beforeAll(() => {
   if (fs.existsSync(fixturePath)) {
@@ -12,7 +12,7 @@ test.beforeAll(() => {
 });
 
 test.afterEach(() => {
-  if (originalContent && fs.existsSync(fixturePath)) {
+  if (originalContent !== null && fs.existsSync(fixturePath)) {
     fs.writeFileSync(fixturePath, originalContent, "utf8");
   }
 });

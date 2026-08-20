@@ -26,21 +26,19 @@ export function useAutosave({
   const latestContentRef = useRef(content);
   latestContentRef.current = content;
 
-  const latestSavedContentRef = useRef<string | null>(content);
-  const savingContentRef = useRef<string | null>(null);
-
   const latestRevisionRef = useRef(revision);
   const latestPathRef = useRef(path);
 
-  // Synchronize path and initial revision when note changes
-  const prevPathRef = useRef(path);
+  const inFlightPromiseRef = useRef<Promise<boolean> | null>(null);
+  const savingContentRef = useRef<string | null>(null);
+  const saveAgainRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  if (path !== prevPathRef.current) {
-    prevPathRef.current = path;
-    latestPathRef.current = path;
+  latestPathRef.current = path;
+
+  // Synchronize revision prop into ref whenever no save is currently in flight
+  if (!inFlightPromiseRef.current) {
     latestRevisionRef.current = revision;
-    latestSavedContentRef.current = content;
-    savingContentRef.current = null;
   }
 
   const onSavedRef = useRef(onSaved);
@@ -51,10 +49,6 @@ export function useAutosave({
 
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
-
-  const inFlightPromiseRef = useRef<Promise<boolean> | null>(null);
-  const saveAgainRef = useRef(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const performSave = useCallback(async (): Promise<boolean> => {
     if (debounceTimerRef.current) {
@@ -70,7 +64,9 @@ export function useAutosave({
     }
 
     if (inFlightPromiseRef.current) {
-      saveAgainRef.current = true;
+      if (latestContentRef.current !== savingContentRef.current) {
+        saveAgainRef.current = true;
+      }
       return inFlightPromiseRef.current;
     }
 
@@ -101,19 +97,19 @@ export function useAutosave({
           savingContentRef.current = c;
           const doc = await saveNote(p, c, r);
           latestRevisionRef.current = doc.revision;
-          latestSavedContentRef.current = c;
-          savingContentRef.current = null;
           setStatus("saved");
           onSavedRef.current?.(doc);
 
-          if (saveAgainRef.current) {
+          if (
+            saveAgainRef.current &&
+            latestContentRef.current !== savingContentRef.current
+          ) {
             shouldLoop = true;
           }
         }
         return lastResult;
       } catch (err: unknown) {
         saveAgainRef.current = false;
-        savingContentRef.current = null;
 
         if (err instanceof ClientError && err.statusCode === 409) {
           setStatus("conflict");
@@ -124,6 +120,7 @@ export function useAutosave({
         }
         return false;
       } finally {
+        savingContentRef.current = null;
         inFlightPromiseRef.current = null;
       }
     })();
@@ -138,7 +135,6 @@ export function useAutosave({
       !enabled ||
       !path ||
       revision === null ||
-      content === latestSavedContentRef.current ||
       content === savingContentRef.current
     ) {
       if (debounceTimerRef.current) {
@@ -155,10 +151,7 @@ export function useAutosave({
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (
-        latestContentRef.current !== latestSavedContentRef.current &&
-        latestContentRef.current !== savingContentRef.current
-      ) {
+      if (latestContentRef.current !== savingContentRef.current) {
         performSave();
       }
     }, 1200);
@@ -176,7 +169,9 @@ export function useAutosave({
       debounceTimerRef.current = null;
     }
     if (inFlightPromiseRef.current) {
-      saveAgainRef.current = true;
+      if (latestContentRef.current !== savingContentRef.current) {
+        saveAgainRef.current = true;
+      }
       return inFlightPromiseRef.current;
     }
     return performSave();
@@ -188,11 +183,11 @@ export function useAutosave({
       debounceTimerRef.current = null;
     }
     saveAgainRef.current = false;
-    latestRevisionRef.current = latestRevisionRef.current ?? revision;
-    latestSavedContentRef.current = latestContentRef.current;
-    savingContentRef.current = null;
+    if (!inFlightPromiseRef.current) {
+      savingContentRef.current = null;
+    }
     setStatus(newStatus);
-  }, [revision]);
+  }, []);
 
   return {
     status,
