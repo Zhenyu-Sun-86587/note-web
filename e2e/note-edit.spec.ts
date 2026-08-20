@@ -803,4 +803,48 @@ test.describe("Note Web E2E Suite", () => {
     await expect(page.locator(".sidebar-container")).toBeVisible();
     await expect(page.locator(".topbar")).toBeVisible();
   });
+
+  test("enforces insert mode via 'i' before allowing text input and takes over Ctrl shortcuts", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible();
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // Click editor in Normal mode
+    await cmContent.click();
+
+    // In normal mode, motions like j, k, l, h, w, b work, but typing arbitrary characters does NOT insert them into doc
+    await page.keyboard.press("j");
+    await page.keyboard.press("k");
+    await page.keyboard.press("l");
+    await page.keyboard.press("h");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // Press 'i' to explicitly enter INSERT mode
+    await page.keyboard.press("i");
+    await expect(vimPanel).toContainText("INSERT");
+
+    // Now typing works properly in insert mode
+    await page.keyboard.type("ExplicitInsertMode");
+    await expect(cmContent).toContainText("ExplicitInsertMode");
+
+    // Press Escape to return to NORMAL mode
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // Test Undo (u) and Redo (Control+r) - Redo does NOT reload the browser
+    await page.keyboard.press("u");
+    await expect(cmContent).not.toContainText("ExplicitInsertMode");
+
+    await page.keyboard.press("Control+r");
+    await expect(cmContent).toContainText("ExplicitInsertMode");
+  });
 });

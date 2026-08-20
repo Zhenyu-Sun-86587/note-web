@@ -6,7 +6,7 @@ import {
 } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { markdown } from "@codemirror/lang-markdown";
-import { vim, Vim } from "@replit/codemirror-vim";
+import { vim, Vim, getCM } from "@replit/codemirror-vim";
 import type { EditorHandle } from "./EditorHandle";
 import "../../styles/vim-editor.css";
 
@@ -106,6 +106,74 @@ export const VimMarkdownEditor = forwardRef<
       }
     });
 
+    // 1. Intercept Ctrl shortcuts to prevent browser hijacking (e.g. Ctrl+R reload, Ctrl+P print, Ctrl+F find, etc.)
+    const vimKeyInterceptor = EditorView.domEventHandlers({
+      keydown: (e, _view) => {
+        const isMac =
+          typeof navigator !== "undefined" &&
+          navigator.platform.toUpperCase().includes("MAC");
+        const mod = isMac ? e.metaKey : e.ctrlKey;
+
+        // Save: Ctrl/Cmd + S
+        if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s") {
+          e.preventDefault();
+          e.stopPropagation();
+          onSaveRef.current?.();
+          return true;
+        }
+
+        // Take over conflicting browser shortcuts so Vim handles them without browser interference
+        if (mod && !e.altKey) {
+          const key = e.key.toLowerCase();
+          const vimHijackCtrlKeys = new Set([
+            "r",
+            "p",
+            "f",
+            "b",
+            "d",
+            "u",
+            "o",
+            "n",
+            "w",
+            "a",
+            "e",
+            "y",
+            "v",
+            "[",
+            "]",
+            "c",
+            "h",
+            "j",
+            "k",
+            "l",
+            "g",
+            "t",
+            "i",
+            "m",
+            "q",
+          ]);
+          if (vimHijackCtrlKeys.has(key)) {
+            e.preventDefault();
+          }
+        }
+
+        return false;
+      },
+    });
+
+    // 2. Guard normal mode against arbitrary direct text insertions without entering insert mode
+    const normalModeInputGuard = EditorView.inputHandler.of(
+      (view, _from, _to, text) => {
+        const cm = getCM(view);
+        const vimState = cm?.state?.vim;
+        if (vimState && !vimState.insertMode && !cm?.curOp?.isVimOp) {
+          if (text === "\0\0") return true;
+          return true; // Block unhandled text insertions in normal/visual mode
+        }
+        return false;
+      },
+    );
+
     const themeExtension = EditorView.theme({
       "&": {
         height: "100%",
@@ -131,6 +199,8 @@ export const VimMarkdownEditor = forwardRef<
     const view = new EditorView({
       doc: value,
       extensions: [
+        vimKeyInterceptor,
+        normalModeInputGuard,
         vim({ status: true }),
         basicSetup,
         markdown(),
