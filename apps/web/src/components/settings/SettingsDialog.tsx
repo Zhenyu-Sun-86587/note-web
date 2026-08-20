@@ -181,6 +181,22 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 <option value="dark">深色 (Dark)</option>
               </select>
             </div>
+            <div className="settings-row">
+              <div className="settings-label">默认编辑器</div>
+              <select
+                className="settings-select"
+                value={settings.editorMode || "ir"}
+                onChange={(e) =>
+                  onUpdateSetting(
+                    "editorMode",
+                    e.target.value as "ir" | "vim",
+                  )
+                }
+              >
+                <option value="ir">即时渲染 (IR)</option>
+                <option value="vim">Vim Markdown</option>
+              </select>
+            </div>
           </div>
 
           {/* Editor Section */}

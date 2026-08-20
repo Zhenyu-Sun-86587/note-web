@@ -1,12 +1,19 @@
-import React, { useEffect, useRef, useId } from "react";
+import {
+  useEffect,
+  useRef,
+  useId,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
 import { uploadAsset } from "../../api/client";
 import { resolveMarkdownPreviewUrl } from "../../utils/preview-url";
+import type { EditorHandle } from "./EditorHandle";
 
 export type Theme = "light" | "dark";
 
-interface VditorEditorProps {
+export interface VditorEditorProps {
   notePath: string;
   value: string;
   theme: Theme;
@@ -21,19 +28,36 @@ const PAIR_MAP: Record<string, string> = {
 
 const CLOSING_SET = new Set([")", "]", "}"]);
 
-export const VditorEditor: React.FC<VditorEditorProps> = ({
-  notePath,
-  value,
-  theme,
-  onChange,
-}) => {
-  const rawId = useId();
-  const hostId = `vditor-${rawId.replaceAll(":", "_")}`;
-  const editorRef = useRef<Vditor | null>(null);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
-  const syncingRef = useRef(false);
-  const lastEmittedValueRef = useRef(value);
+export const VditorEditor = forwardRef<EditorHandle, VditorEditorProps>(
+  ({ notePath, value, theme, onChange }, ref) => {
+    const rawId = useId();
+    const hostId = `vditor-${rawId.replaceAll(":", "_")}`;
+    const editorRef = useRef<Vditor | null>(null);
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+    const syncingRef = useRef(false);
+    const lastEmittedValueRef = useRef(value);
+
+    // Expose imperative handle
+    useImperativeHandle(
+      ref,
+      () => ({
+        getValue: () => {
+          if (editorRef.current) {
+            try {
+              return editorRef.current.getValue();
+            } catch {
+              return lastEmittedValueRef.current;
+            }
+          }
+          return lastEmittedValueRef.current;
+        },
+        focus: () => {
+          editorRef.current?.focus();
+        },
+      }),
+      [],
+    );
 
   // Initialize Vditor instance
   useEffect(() => {
@@ -239,4 +263,6 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
   }, [value]);
 
   return <div id={hostId} className="editor-container" />;
-};
+});
+
+VditorEditor.displayName = "VditorEditor";

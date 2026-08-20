@@ -8,6 +8,7 @@ import "./styles/themes/dark.css";
 import "./styles/fonts.css";
 import "./styles/app.css";
 import "./styles/vditor-overrides.css";
+import "./styles/vim-editor.css";
 
 // Append custom.css last to ensure user overrides have the highest priority
 const customLink = document.createElement("link");

@@ -18,6 +18,8 @@ interface TopBarProps {
   onToggleSidebar: () => void;
   onOpenSettings: () => void;
   onToggleZenMode?: () => void;
+  editorMode: "ir" | "vim";
+  onToggleEditorMode: (mode: "ir" | "vim") => void;
   onSave: () => void;
   canSave: boolean;
   onRename: () => void;
@@ -31,6 +33,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleSidebar,
   onOpenSettings,
   onToggleZenMode,
+  editorMode,
+  onToggleEditorMode,
   onSave,
   canSave,
   onRename,
@@ -58,6 +62,25 @@ export const TopBar: React.FC<TopBarProps> = ({
       </div>
 
       <div className="topbar-right">
+        <div className="editor-mode-toggle" role="group" aria-label="编辑器模式">
+          <button
+            type="button"
+            className={`mode-btn ${editorMode === "ir" ? "active" : ""}`}
+            onClick={() => onToggleEditorMode("ir")}
+            title="即时渲染 (IR Mode)"
+          >
+            IR
+          </button>
+          <button
+            type="button"
+            className={`mode-btn ${editorMode === "vim" ? "active" : ""}`}
+            onClick={() => onToggleEditorMode("vim")}
+            title="Vim Markdown Mode"
+          >
+            VIM
+          </button>
+        </div>
+
         {currentPath && (
           <>
             <Button
@@ -125,7 +148,11 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <IconButton
           icon={<Maximize2 size={18} />}
-          label="专注模式 (Esc 退出)"
+          label={
+            editorMode === "vim"
+              ? "专注模式 (:zen 退出)"
+              : "专注模式 (Esc 退出)"
+          }
           onClick={onToggleZenMode}
           size="sm"
         />

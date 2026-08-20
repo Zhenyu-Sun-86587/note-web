@@ -94,4 +94,59 @@ describe("useKeyboardShortcuts hook", () => {
     window.dispatchEvent(ctrlK);
     expect(onSearch).not.toHaveBeenCalled();
   });
+
+  it("preserves Vim keys when focused inside .note-web-vim-editor, but allows Ctrl+S and modal Escape", () => {
+    const onSave = vi.fn();
+    const onQuickOpen = vi.fn();
+    const onEscape = vi.fn();
+    renderHook(() =>
+      useKeyboardShortcuts({ onSave, onQuickOpen, onEscape }),
+    );
+
+    const vimContainer = document.createElement("div");
+    vimContainer.className = "note-web-vim-editor";
+    const vimEditor = document.createElement("div");
+    vimEditor.className = "cm-editor";
+    vimContainer.appendChild(vimEditor);
+    document.body.appendChild(vimContainer);
+
+    // 1. Ctrl+P inside Vim editor should NOT trigger onQuickOpen
+    const ctrlP = new KeyboardEvent("keydown", {
+      key: "p",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    vimEditor.dispatchEvent(ctrlP);
+    expect(onQuickOpen).not.toHaveBeenCalled();
+
+    // 2. Escape inside Vim editor should NOT trigger global onEscape
+    const escapeKey = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    vimEditor.dispatchEvent(escapeKey);
+    expect(onEscape).not.toHaveBeenCalled();
+
+    // 3. Ctrl+S inside Vim editor SHOULD trigger onSave
+    const ctrlS = new KeyboardEvent("keydown", {
+      key: "s",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    vimEditor.dispatchEvent(ctrlS);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    // 4. Modal element inside or outside should allow Escape
+    const modal = document.createElement("div");
+    modal.className = "modal-content";
+    document.body.appendChild(modal);
+    modal.dispatchEvent(escapeKey);
+    expect(onEscape).toHaveBeenCalledTimes(1);
+
+    vimContainer.remove();
+    modal.remove();
+  });
 });

@@ -29,10 +29,11 @@ import {
   createFolder,
   deleteFolder,
 } from "./api/client";
-import { useSettings } from "./hooks/useSettings";
+import { useSettings, type EditorMode } from "./hooks/useSettings";
 import { useAutosave } from "./hooks/useAutosave";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useWindowFocusRefresh } from "./hooks/useWindowFocusRefresh";
+import type { EditorHandle } from "./components/editor/EditorHandle";
 import { generateConflictPath } from "./utils/filename";
 import { getDirname, getBasename } from "./utils/note-path";
 import { generateCopyFilename } from "./utils/copy-name";
@@ -112,6 +113,32 @@ export default function App() {
   const isDirty = openNote !== null && draftContent !== openNote.content;
   const isDirtyRef = useRef(isDirty);
   isDirtyRef.current = isDirty;
+
+  const [editorMode, setEditorMode] = useState<EditorMode>(
+    () => settings.editorMode || "ir",
+  );
+  const editorPaneRef = useRef<EditorHandle | null>(null);
+
+  useEffect(() => {
+    if (settings.editorMode && settings.editorMode !== editorMode) {
+      setEditorMode(settings.editorMode);
+    }
+  }, [settings.editorMode]);
+
+  const handleSwitchEditorMode = useCallback(
+    (mode: EditorMode) => {
+      if (editorMode === mode) return;
+      const currentRealValue = editorPaneRef.current?.getValue();
+      if (
+        typeof currentRealValue === "string" &&
+        currentRealValue !== draftContent
+      ) {
+        setDraftContent(currentRealValue);
+      }
+      setEditorMode(mode);
+    },
+    [editorMode, draftContent],
+  );
 
   const [zenMode, setZenMode] = useState(false);
   const [showZenHint, setShowZenHint] = useState(false);
@@ -629,7 +656,9 @@ export default function App() {
       }
     >
       {zenMode && showZenHint && (
-        <div className="zen-mode-hint">Esc 退出专注模式</div>
+        <div className="zen-mode-hint">
+          {editorMode === "vim" ? ":zen 退出专注模式" : "Esc 退出专注模式"}
+        </div>
       )}
 
       <TopBar
@@ -638,6 +667,8 @@ export default function App() {
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
         onOpenSettings={() => setSettingsOpen(true)}
         onToggleZenMode={toggleZenMode}
+        editorMode={editorMode}
+        onToggleEditorMode={handleSwitchEditorMode}
         onSave={saveNow}
         canSave={Boolean(openNote) && saveStatus !== "conflict"}
         onRename={() => {
@@ -656,10 +687,12 @@ export default function App() {
       />
 
       <EditorPane
+        ref={editorPaneRef}
         notePath={openNote?.path ?? null}
         initialContent={draftContent}
         hasConflict={saveStatus === "conflict"}
         theme={effectiveTheme}
+        editorMode={editorMode}
         onChange={(val) => setDraftContent(val)}
         onNewNote={() => {
           setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
@@ -667,6 +700,9 @@ export default function App() {
         }}
         onReloadConflict={handleReloadConflict}
         onSaveAsConflictCopy={handleSaveAsConflictCopy}
+        onSave={saveNow}
+        onSwitchToIR={() => handleSwitchEditorMode("ir")}
+        onToggleZen={toggleZenMode}
       />
 
       <StatusBar

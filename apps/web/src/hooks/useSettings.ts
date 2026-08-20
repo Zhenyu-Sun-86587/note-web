@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 
 export type ThemePreference = "system" | "light" | "dark";
+export type EditorMode = "ir" | "vim";
 
 export interface AppSettings {
   theme: ThemePreference;
+  editorMode: EditorMode;
   editorFont: string;
   editorFontSize: number;
   editorLineHeight: number;
@@ -18,6 +20,7 @@ export const SETTINGS_KEY = "note-web-settings-v1";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
+  editorMode: "ir",
   editorFont:
     '"NoteWeb CJK", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
   editorFontSize: 16,

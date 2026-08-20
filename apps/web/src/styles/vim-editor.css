@@ -1,0 +1,93 @@
+/* Vim Markdown Editor Styles */
+
+.note-web-vim-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: var(--app-bg);
+  color: var(--text-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.note-web-vim-editor .cm-editor {
+  height: 100%;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--editor-font-size, 16px);
+  background-color: var(--app-bg);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.note-web-vim-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.note-web-vim-editor .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: var(--editor-line-height, 1.75);
+  overflow: auto;
+  padding: 0;
+}
+
+.note-web-vim-editor .cm-content {
+  max-width: var(--editor-max-width, 900px);
+  margin: 0 auto;
+  padding: 24px var(--editor-padding-x, 48px) 120px var(--editor-padding-x, 48px);
+  font-family: var(--font-mono);
+  caret-color: var(--accent);
+}
+
+.note-web-vim-editor .cm-line {
+  padding: 0;
+}
+
+.note-web-vim-editor .cm-gutters {
+  background-color: var(--panel-bg);
+  border-right: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.note-web-vim-editor .cm-activeLineGutter {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.note-web-vim-editor .cm-activeLine {
+  background-color: transparent;
+}
+
+.note-web-vim-editor .cm-selectionBackground,
+.note-web-vim-editor ::selection {
+  background-color: var(--selection-bg, rgba(74, 144, 226, 0.25)) !important;
+}
+
+/* Vim Status Panel */
+.note-web-vim-editor .cm-vim-panel {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 16px;
+  background-color: var(--panel-bg);
+  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.note-web-vim-editor .cm-vim-panel input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  width: 100%;
+}

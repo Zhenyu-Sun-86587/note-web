@@ -13,20 +13,32 @@ interface ShortcutsOptions {
 export function useKeyboardShortcuts(options: ShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target instanceof Element ? e.target : null;
+      const isInsideVim = Boolean(target?.closest(".note-web-vim-editor"));
+      const isInsideModal = Boolean(
+        target?.closest(".modal-backdrop, .modal-content, [role='dialog']"),
+      );
+
       const isMac =
         typeof navigator !== "undefined" &&
         navigator.platform.toUpperCase().includes("MAC");
       const mod = isMac ? e.metaKey : e.ctrlKey;
 
-      if (e.key === "Escape") {
-        options.onEscape?.();
-        return;
-      }
-
-      // Save: Ctrl/Cmd + S
+      // Save: Ctrl/Cmd + S is always intercepted and handled
       if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         options.onSave?.();
+        return;
+      }
+
+      // If focus is inside Vim editor (and not inside an open modal dialog),
+      // allow Vim to handle all other keys natively (Ctrl+P, Ctrl+N, Ctrl+B, Ctrl+F, Escape, etc.)
+      if (isInsideVim && !isInsideModal) {
+        return;
+      }
+
+      if (e.key === "Escape") {
+        options.onEscape?.();
         return;
       }
 

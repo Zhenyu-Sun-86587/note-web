@@ -577,7 +577,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(page.locator(".topbar-path")).toContainText("inbox/welcome.md");
   });
 
-  test("switching clean notes does not issue PUT /api/notes/* requests", async ({
+  test("switching clean notes does not issue PUT /api/note requests", async ({
     page,
   }) => {
     await page.goto("/");
@@ -586,7 +586,7 @@ test.describe("Note Web E2E Suite", () => {
 
     let putRequestCount = 0;
     page.on("request", (req) => {
-      if (req.method() === "PUT" && req.url().includes("/api/notes/")) {
+      if (req.method() === "PUT" && req.url().includes("/api/note")) {
         putRequestCount++;
       }
     });
@@ -620,5 +620,187 @@ test.describe("Note Web E2E Suite", () => {
 
     // No PUT requests should have occurred
     expect(putRequestCount).toBe(0);
+  });
+
+  test("seamlessly switches between IR and VIM modes without losing pending input", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const editorContainer = page.locator(".vditor-ir .vditor-reset");
+    await expect(editorContainer).toBeVisible({ timeout: 10000 });
+
+    const irBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "IR",
+    });
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+
+    await expect(irBtn).toHaveClass(/active/);
+
+    // 1. Type in IR and immediately switch to VIM
+    await editorContainer.click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" ImmediateIRText");
+
+    await vimBtn.click();
+    await expect(vimBtn).toHaveClass(/active/);
+
+    // Verify Vim editor is mounted with the typed text intact
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible();
+    await expect(cmContent).toContainText("ImmediateIRText");
+
+    // 2. Type in VIM (in Insert mode) and immediately switch to IR
+    await cmContent.click();
+    await page.keyboard.press("i");
+    await page.keyboard.type(" ImmediateVimText");
+    await page.keyboard.press("Escape");
+
+    await irBtn.click();
+    await expect(irBtn).toHaveClass(/active/);
+
+    // Verify Vditor editor is mounted with the typed Vim text intact
+    const reloadedVditor = page.locator(".vditor-ir .vditor-reset");
+    await expect(reloadedVditor).toBeVisible();
+    await expect(reloadedVditor).toContainText("ImmediateVimText");
+  });
+
+  test("executes native Vim motions, operators (dw, u, Ctrl+R), search, and Ex commands (:w, :ir)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+    await expect(vimPanel).toBeVisible();
+
+    // Focus editor and verify NORMAL mode
+    await cmContent.click();
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // Insert a test line
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("firstword secondword thirdword");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toContainText("firstword secondword thirdword");
+
+    // dw to delete word
+    await page.keyboard.press("0");
+    await page.keyboard.press("d");
+    await page.keyboard.press("w");
+    await expect(cmContent).not.toContainText("firstword");
+    await expect(cmContent).toContainText("secondword thirdword");
+
+    // u to undo
+    await page.keyboard.press("u");
+    await expect(cmContent).toContainText("firstword secondword thirdword");
+
+    // Ctrl+r to redo
+    await page.keyboard.press("Control+r");
+    await expect(cmContent).not.toContainText("firstword");
+
+    // Search /secondword
+    await page.keyboard.press("/");
+    await page.keyboard.type("secondword");
+    await page.keyboard.press("Enter");
+
+    // Ex command :w saves document
+    await page.keyboard.press(":");
+    await page.keyboard.type("w");
+    await page.keyboard.press("Enter");
+
+    const statusBar = page.locator(".statusbar");
+    await expect(statusBar).toContainText("已保存", { timeout: 8000 });
+
+    // Ex command :ir switches to IR mode
+    await page.keyboard.press(":");
+    await page.keyboard.type("ir");
+    await page.keyboard.press("Enter");
+
+    const vditorEditor = page.locator(".vditor-ir .vditor-reset");
+    await expect(vditorEditor).toBeVisible();
+    await expect(vditorEditor).toContainText("secondword thirdword");
+  });
+
+  test("handles Chinese IME in Vim Insert mode and returns to Normal mode smoothly", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible();
+
+    await cmContent.click();
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("中文Vim测试文本");
+    await page.keyboard.press("Escape");
+
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toContainText("中文Vim测试文本");
+
+    // Test dw on Chinese content
+    await page.keyboard.press("0");
+    await page.keyboard.press("x"); // delete single character
+    await expect(cmContent).toContainText("文Vim测试文本");
+    await page.keyboard.press("u"); // undo
+    await expect(cmContent).toContainText("中文Vim测试文本");
+  });
+
+  test("Vim Mode + Zen Mode: Escape belongs to Vim and :zen exits Zen Mode", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const zenBtn = page.getByRole("button", {
+      name: "专注模式 (:zen 退出)",
+    });
+    await expect(zenBtn).toBeVisible();
+    await zenBtn.click();
+
+    const appShell = page.locator(".app-shell");
+    await expect(appShell).toHaveClass(/zen-mode/);
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible();
+    await expect(vimPanel).toBeVisible(); // Vim status bar remains in Zen
+
+    // Enter insert mode in Zen
+    await cmContent.click();
+    await page.keyboard.press("i");
+    await page.keyboard.type(" ZenVimEditing");
+    await expect(vimPanel).toContainText("INSERT");
+
+    // Press Escape inside Vim -> goes back to Normal, does NOT exit Zen
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(appShell).toHaveClass(/zen-mode/);
+
+    // Type :zen in Vim Ex command -> exits Zen Mode
+    await page.keyboard.press(":");
+    await page.keyboard.type("zen");
+    await page.keyboard.press("Enter");
+
+    await expect(appShell).not.toHaveClass(/zen-mode/);
+    await expect(page.locator(".sidebar-container")).toBeVisible();
+    await expect(page.locator(".topbar")).toBeVisible();
   });
 });
