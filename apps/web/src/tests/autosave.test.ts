@@ -419,4 +419,126 @@ describe("useAutosave hook", () => {
       "rev-2",
     );
   });
+
+  it("flush on a clean note does not call saveNote", async () => {
+    const saveNoteMock = vi.mocked(client.saveNote);
+    saveNoteMock.mockReset();
+
+    const { result } = renderHook(() => {
+      const [openNote, setOpenNote] = useState<{
+        path: string;
+        content: string;
+        revision: string;
+      } | null>({
+        path: "inbox/clean.md",
+        content: "Clean Content",
+        revision: "rev-clean-1",
+      });
+      const [draft, setDraft] = useState("Clean Content");
+      const isDirty = openNote !== null && openNote.content !== draft;
+
+      const autosave = useAutosave({
+        path: openNote?.path ?? null,
+        content: draft,
+        revision: openNote?.revision ?? null,
+        enabled: Boolean(openNote) && isDirty,
+        onSaved: (doc) => {
+          setOpenNote({
+            path: doc.path,
+            content: doc.content,
+            revision: doc.revision,
+          });
+        },
+      });
+
+      // Emulate flush helper with isDirty check
+      const flushCurrentNote = async () => {
+        if (!openNote || !isDirty) {
+          return true;
+        }
+        return autosave.saveNow();
+      };
+
+      return { autosave, flushCurrentNote, setDraft, openNote };
+    });
+
+    // Flush clean note
+    let flushResult: boolean = false;
+    await act(async () => {
+      flushResult = await result.current.flushCurrentNote();
+    });
+
+    expect(flushResult).toBe(true);
+    expect(saveNoteMock).not.toHaveBeenCalled();
+  });
+
+  it("flush on a dirty note calls saveNote once and updates document", async () => {
+    const saveNoteMock = vi.mocked(client.saveNote);
+    saveNoteMock.mockReset();
+    saveNoteMock.mockResolvedValue({
+      path: "inbox/dirty.md",
+      content: "Dirty Content Updated",
+      revision: "rev-dirty-2",
+      modifiedAt: "2026-08-20T12:02:00.000Z",
+      size: 21,
+    });
+
+    const { result } = renderHook(() => {
+      const [openNote, setOpenNote] = useState<{
+        path: string;
+        content: string;
+        revision: string;
+      } | null>({
+        path: "inbox/dirty.md",
+        content: "Initial Content",
+        revision: "rev-dirty-1",
+      });
+      const [draft, setDraft] = useState("Initial Content");
+      const isDirty = openNote !== null && openNote.content !== draft;
+
+      const autosave = useAutosave({
+        path: openNote?.path ?? null,
+        content: draft,
+        revision: openNote?.revision ?? null,
+        enabled: Boolean(openNote) && isDirty,
+        onSaved: (doc) => {
+          setOpenNote({
+            path: doc.path,
+            content: doc.content,
+            revision: doc.revision,
+          });
+        },
+      });
+
+      // Emulate flush helper with isDirty check
+      const flushCurrentNote = async () => {
+        if (!openNote || !isDirty) {
+          return true;
+        }
+        return autosave.saveNow();
+      };
+
+      return { autosave, flushCurrentNote, setDraft, openNote };
+    });
+
+    // Edit to dirty
+    act(() => {
+      result.current.setDraft("Dirty Content Updated");
+    });
+
+    // Flush dirty note
+    let flushResult: boolean = false;
+    await act(async () => {
+      flushResult = await result.current.flushCurrentNote();
+    });
+
+    expect(flushResult).toBe(true);
+    expect(saveNoteMock).toHaveBeenCalledTimes(1);
+    expect(saveNoteMock).toHaveBeenCalledWith(
+      "inbox/dirty.md",
+      "Dirty Content Updated",
+      "rev-dirty-1",
+    );
+    expect(result.current.openNote?.revision).toBe("rev-dirty-2");
+  });
 });

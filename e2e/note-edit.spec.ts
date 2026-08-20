@@ -256,23 +256,59 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.type("CurlyText");
     await expect(editorContainer).toContainText("{CurlyText}");
 
-    // Test D: Skip close on )
+    // Test D1: Skip close on )
     await page.keyboard.press("Enter");
     await page.keyboard.press("(");
     await page.keyboard.press(")");
     await page.keyboard.type("SkipRound");
     await expect(editorContainer).toContainText("()SkipRound");
 
-    // Test E: Selection wrap
+    // Test D2: Skip close on ]
     await page.keyboard.press("Enter");
-    await page.keyboard.type("wraptext");
+    await page.keyboard.press("[");
+    await page.keyboard.press("]");
+    await page.keyboard.type("SkipSquare");
+    await expect(editorContainer).toContainText("[]SkipSquare");
+
+    // Test D3: Skip close on }
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("{");
+    await page.keyboard.press("}");
+    await page.keyboard.type("SkipCurly");
+    await expect(editorContainer).toContainText("{}SkipCurly");
+
+    // Test E1: Selection wrap ()
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("wraptext1");
     await page.keyboard.down("Shift");
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 9; i++) {
       await page.keyboard.press("ArrowLeft");
     }
     await page.keyboard.up("Shift");
     await page.keyboard.press("(");
-    await expect(editorContainer).toContainText("(wraptext)");
+    await expect(editorContainer).toContainText("(wraptext1)");
+
+    // Test E2: Selection wrap []
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("wraptext2");
+    await page.keyboard.down("Shift");
+    for (let i = 0; i < 9; i++) {
+      await page.keyboard.press("ArrowLeft");
+    }
+    await page.keyboard.up("Shift");
+    await page.keyboard.press("[");
+    await expect(editorContainer).toContainText("[wraptext2]");
+
+    // Test E3: Selection wrap {}
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("wraptext3");
+    await page.keyboard.down("Shift");
+    for (let i = 0; i < 9; i++) {
+      await page.keyboard.press("ArrowLeft");
+    }
+    await page.keyboard.up("Shift");
+    await page.keyboard.press("{");
+    await expect(editorContainer).toContainText("{wraptext3}");
   });
 
   test("supports mouse drag resizing of sidebar and persists width across reload", async ({
@@ -479,5 +515,110 @@ test.describe("Note Web E2E Suite", () => {
     await revertDialog.locator('input[type="text"]').fill("projects");
     await revertDialog.getByRole("button", { name: "保存" }).click();
     await expect(revertDialog).not.toBeVisible();
+  });
+
+  test("serves custom server fonts via /custom/fonts/* with status 200", async ({
+    request,
+  }) => {
+    const resReg = await request.get("/custom/fonts/NoteWebCJK-Regular.woff2");
+    expect(resReg.status()).toBe(200);
+    const bodyReg = await resReg.body();
+    expect(bodyReg.length).toBeGreaterThan(1000000);
+
+    const resBold = await request.get("/custom/fonts/NoteWebCJK-Bold.woff2");
+    expect(resBold.status()).toBe(200);
+
+    const resMono = await request.get("/custom/fonts/NoteWebMonoCJK-Regular.woff2");
+    expect(resMono.status()).toBe(200);
+  });
+
+  test("toggles Zen Mode, hides application UI chrome, and exits via Escape", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const editorContainer = page.locator(".vditor-ir .vditor-reset");
+    await expect(editorContainer).toBeVisible({ timeout: 10000 });
+
+    const sidebar = page.locator(".sidebar-container");
+    const topBar = page.locator(".topbar");
+    const statusBar = page.locator(".statusbar");
+    const vditorToolbar = page.locator(".vditor-toolbar");
+
+    await expect(sidebar).toBeVisible();
+    await expect(topBar).toBeVisible();
+    await expect(statusBar).toBeVisible();
+
+    // Click Zen Mode button in TopBar
+    const zenBtn = page.getByRole("button", { name: "专注模式 (Esc 退出)" });
+    await expect(zenBtn).toBeVisible();
+    await zenBtn.click();
+
+    // App shell has zen-mode class, UI chrome is hidden
+    const appShell = page.locator(".app-shell");
+    await expect(appShell).toHaveClass(/zen-mode/);
+    await expect(sidebar).not.toBeVisible();
+    await expect(topBar).not.toBeVisible();
+    await expect(statusBar).not.toBeVisible();
+    await expect(vditorToolbar).not.toBeVisible();
+
+    // Editor is still interactive in Zen Mode
+    await editorContainer.click();
+    await page.keyboard.type(" Typing In Zen Mode");
+    await expect(editorContainer).toContainText("Typing In Zen Mode");
+
+    // Press Escape to exit Zen Mode
+    await page.keyboard.press("Escape");
+    await expect(appShell).not.toHaveClass(/zen-mode/);
+
+    // Chrome is visible again
+    await expect(sidebar).toBeVisible();
+    await expect(topBar).toBeVisible();
+    await expect(statusBar).toBeVisible();
+    await expect(page.locator(".topbar-path")).toContainText("inbox/welcome.md");
+  });
+
+  test("switching clean notes does not issue PUT /api/notes/* requests", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const editorContainer = page.locator(".vditor-ir .vditor-reset");
+    await expect(editorContainer).toBeVisible({ timeout: 10000 });
+
+    let putRequestCount = 0;
+    page.on("request", (req) => {
+      if (req.method() === "PUT" && req.url().includes("/api/notes/")) {
+        putRequestCount++;
+      }
+    });
+
+    // Open projects/example.md (clean switch)
+    const exampleNote = page
+      .locator(".tree-note")
+      .filter({ hasText: "example" })
+      .first();
+    const isExampleVisible = await exampleNote.isVisible();
+    if (!isExampleVisible) {
+      const projectsFolder = page
+        .locator(".tree-folder")
+        .filter({ hasText: "projects" })
+        .first();
+      await projectsFolder.click();
+    }
+    await expect(exampleNote).toBeVisible({ timeout: 5000 });
+    await exampleNote.click();
+    await expect(page.locator(".topbar-path")).toContainText("projects/example.md");
+
+    // Switch back to inbox/welcome.md (clean)
+    const welcomeNote = page
+      .locator(".tree-note")
+      .filter({ hasText: "welcome" })
+      .first();
+    await welcomeNote.click();
+    await expect(page.locator(".topbar-path")).toContainText("inbox/welcome.md");
+
+    await page.waitForTimeout(500);
+
+    // No PUT requests should have occurred
+    expect(putRequestCount).toBe(0);
   });
 });

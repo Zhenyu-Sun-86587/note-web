@@ -5,6 +5,7 @@ import "./styles/reset.css";
 import "./styles/variables.css";
 import "./styles/themes/light.css";
 import "./styles/themes/dark.css";
+import "./styles/fonts.css";
 import "./styles/app.css";
 import "./styles/vditor-overrides.css";
 

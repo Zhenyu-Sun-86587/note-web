@@ -1,0 +1,31 @@
+@font-face {
+  font-family: "NoteWeb CJK";
+  src: url("/custom/fonts/NoteWebCJK-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NoteWeb CJK";
+  src: url("/custom/fonts/NoteWebCJK-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NoteWeb Mono CJK";
+  src: url("/custom/fonts/NoteWebMonoCJK-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NoteWeb Mono CJK";
+  src: url("/custom/fonts/NoteWebMonoCJK-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

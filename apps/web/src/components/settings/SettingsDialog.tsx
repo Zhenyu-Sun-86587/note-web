@@ -18,6 +18,11 @@ interface SettingsDialogProps {
 
 const EDITOR_FONT_PRESETS: { label: string; value: string }[] = [
   {
+    label: "服务器中文字体（推荐）",
+    value:
+      '"NoteWeb CJK", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
+  },
+  {
     label: "中文无衬线 (CJK Sans)",
     value:
       '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif',
@@ -30,10 +35,10 @@ const EDITOR_FONT_PRESETS: { label: string; value: string }[] = [
   {
     label: "中文等宽 / 编程 (CJK Mono)",
     value:
-      '"Maple Mono CN NF", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Microsoft YaHei Mono", ui-monospace, monospace',
+      '"NoteWeb Mono CJK", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Microsoft YaHei Mono", ui-monospace, monospace',
   },
   {
-    label: "Maple Mono CN NF (本机已安装)",
+    label: "Maple Mono CN NF（本机）",
     value:
       '"Maple Mono CN NF", "Maple Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   },
@@ -55,6 +60,11 @@ const EDITOR_FONT_PRESETS: { label: string; value: string }[] = [
 
 const UI_FONT_PRESETS: { label: string; value: string }[] = [
   {
+    label: "服务器中文字体（推荐）",
+    value:
+      '"NoteWeb CJK", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif',
+  },
+  {
     label: "系统默认 (System CJK)",
     value:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif',
@@ -65,19 +75,24 @@ const UI_FONT_PRESETS: { label: string; value: string }[] = [
       '"Inter", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", Arial, sans-serif',
   },
   {
-    label: "Maple Mono CN NF (本机已安装)",
+    label: "Maple Mono CN NF（本机）",
     value: '"Maple Mono CN NF", "Maple Mono", ui-monospace, monospace',
   },
 ];
 
 const MONO_FONT_PRESETS: { label: string; value: string }[] = [
   {
-    label: "中文等宽 (CJK Mono)",
+    label: "服务器等宽字体（推荐）",
     value:
-      '"Maple Mono CN NF", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Microsoft YaHei Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      '"NoteWeb Mono CJK", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", ui-monospace, monospace',
   },
   {
-    label: "Maple Mono CN NF (本机已安装)",
+    label: "中文等宽 (CJK Mono)",
+    value:
+      '"Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Microsoft YaHei Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  },
+  {
+    label: "Maple Mono CN NF（本机）",
     value: '"Maple Mono CN NF", "Maple Mono", ui-monospace, monospace',
   },
   {

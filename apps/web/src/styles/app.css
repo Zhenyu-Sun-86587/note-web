@@ -836,3 +836,46 @@ kbd {
     transform: rotate(360deg);
   }
 }
+
+/* Zen Mode (专注模式) */
+.app-shell.zen-mode .sidebar-container,
+.app-shell.zen-mode .sidebar-resizer,
+.app-shell.zen-mode .topbar,
+.app-shell.zen-mode .statusbar,
+.app-shell.zen-mode .vditor-toolbar {
+  display: none !important;
+}
+
+.app-shell.zen-mode .main-container {
+  width: 100vw;
+  height: 100vh;
+}
+
+.app-shell.zen-mode .editor-pane,
+.app-shell.zen-mode .editor-wrapper,
+.app-shell.zen-mode .vditor {
+  height: 100vh;
+}
+
+.zen-mode-hint {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  padding: 6px 14px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 12px;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  z-index: 1000;
+  animation: zenHintFade 2.2s forwards;
+}
+
+@keyframes zenHintFade {
+  0% { opacity: 0; transform: translateY(-4px); }
+  15% { opacity: 1; transform: translateY(0); }
+  70% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}

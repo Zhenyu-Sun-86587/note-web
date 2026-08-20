@@ -110,6 +110,29 @@ export default function App() {
   const [clipboard, setClipboard] = useState<FileClipboard | null>(null);
 
   const isDirty = openNote !== null && draftContent !== openNote.content;
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
+  const [zenMode, setZenMode] = useState(false);
+  const [showZenHint, setShowZenHint] = useState(false);
+  const zenHintTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const toggleZenMode = useCallback(() => {
+    setZenMode((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowZenHint(true);
+        if (zenHintTimerRef.current) clearTimeout(zenHintTimerRef.current);
+        zenHintTimerRef.current = setTimeout(() => {
+          setShowZenHint(false);
+        }, 2200);
+      } else {
+        setShowZenHint(false);
+        if (zenHintTimerRef.current) clearTimeout(zenHintTimerRef.current);
+      }
+      return next;
+    });
+  }, []);
 
   // Load tree
   const loadTree = useCallback(async () => {
@@ -184,7 +207,7 @@ export default function App() {
 
   // Flush helper that aborts if dirty save fails
   const flushCurrentNote = useCallback(async (): Promise<boolean> => {
-    if (!openNoteRef.current) {
+    if (!openNoteRef.current || !isDirtyRef.current) {
       return true;
     }
     return saveNow();
@@ -487,11 +510,71 @@ export default function App() {
     }
   };
 
+  // Escape handler respecting modals > zenMode
+  const handleEscape = useCallback(() => {
+    if (settingsOpen) {
+      setSettingsOpen(false);
+      return;
+    }
+    if (quickOpenOpen) {
+      setQuickOpenOpen(false);
+      return;
+    }
+    if (searchOpen) {
+      setSearchOpen(false);
+      return;
+    }
+    if (newNoteOpen) {
+      setNewNoteOpen(false);
+      return;
+    }
+    if (newFolderOpen) {
+      setNewFolderOpen(false);
+      return;
+    }
+    if (renameOpen) {
+      setRenameOpen(false);
+      setRenameTarget(null);
+      return;
+    }
+    if (moveOpen) {
+      setMoveOpen(false);
+      setMoveTarget(null);
+      return;
+    }
+    if (deleteDialogOpen) {
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+      return;
+    }
+    if (contextMenuTarget) {
+      setContextMenuTarget(null);
+      return;
+    }
+    if (zenMode) {
+      setZenMode(false);
+      setShowZenHint(false);
+      return;
+    }
+  }, [
+    settingsOpen,
+    quickOpenOpen,
+    searchOpen,
+    newNoteOpen,
+    newFolderOpen,
+    renameOpen,
+    moveOpen,
+    deleteDialogOpen,
+    contextMenuTarget,
+    zenMode,
+  ]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onSave: () => {
       if (openNote) saveNow();
     },
+    onEscape: handleEscape,
     onQuickOpen: () => setQuickOpenOpen(true),
     onSearch: () => setSearchOpen(true),
     onToggleSidebar: () => setSidebarOpen((prev) => !prev),
@@ -510,6 +593,7 @@ export default function App() {
       sidebarOpen={sidebarOpen}
       sidebarWidth={settings.sidebarWidth}
       onResizeSidebar={(newWidth) => updateSetting("sidebarWidth", newWidth)}
+      zenMode={zenMode}
       sidebar={
         <Sidebar
           items={tree}
@@ -544,11 +628,16 @@ export default function App() {
         />
       }
     >
+      {zenMode && showZenHint && (
+        <div className="zen-mode-hint">Esc 退出专注模式</div>
+      )}
+
       <TopBar
         currentPath={openNote?.path ?? null}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onToggleZenMode={toggleZenMode}
         onSave={saveNow}
         canSave={Boolean(openNote) && saveStatus !== "conflict"}
         onRename={() => {

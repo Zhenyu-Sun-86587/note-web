@@ -24,6 +24,7 @@ export default defineConfig({
       PORT: "3030",
       HOST: "127.0.0.1",
       VAULT_ROOT: path.resolve(__dirname, "test-vault"),
+      FONTS_DIR: path.resolve(__dirname, "config/fonts"),
     },
   },
   projects: [

@@ -27,10 +27,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`VAULT_ROOT must be a directory: ${vaultRoot}`);
   }
 
-  const customCssPath = path.resolve(
+  const defaultCustomCss = path.resolve(process.cwd(), "./config/custom.css");
+  const fallbackCustomCss = path.resolve(
     process.cwd(),
-    env.CUSTOM_CSS_PATH || "./config/custom.css",
+    "../../config/custom.css",
   );
+  const altCustomCss = path.resolve(process.cwd(), "../config/custom.css");
+
+  const customCssPath = env.CUSTOM_CSS_PATH
+    ? path.resolve(process.cwd(), env.CUSTOM_CSS_PATH)
+    : fs.existsSync(defaultCustomCss)
+      ? defaultCustomCss
+      : fs.existsSync(fallbackCustomCss)
+        ? fallbackCustomCss
+        : fs.existsSync(altCustomCss)
+          ? altCustomCss
+          : defaultCustomCss;
+
   const maxNoteBytes = Number.parseInt(
     env.MAX_NOTE_BYTES || "2097152",
     10,
@@ -51,9 +64,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
         ? fallbackWebDist
         : undefined;
 
+  const defaultFontsDir = path.resolve(process.cwd(), "./config/fonts");
+  const fallbackFontsDir = path.resolve(
+    process.cwd(),
+    "../../config/fonts",
+  );
+  const altFontsDir = path.resolve(process.cwd(), "../config/fonts");
+
   const fontsDir = env.FONTS_DIR
     ? path.resolve(process.cwd(), env.FONTS_DIR)
-    : path.resolve(process.cwd(), "./config/fonts");
+    : fs.existsSync(defaultFontsDir)
+      ? defaultFontsDir
+      : fs.existsSync(fallbackFontsDir)
+        ? fallbackFontsDir
+        : fs.existsSync(altFontsDir)
+          ? altFontsDir
+          : defaultFontsDir;
 
   return {
     host,

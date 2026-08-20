@@ -6,6 +6,7 @@ interface AppShellProps {
   sidebarOpen: boolean;
   sidebarWidth?: number;
   onResizeSidebar?: (newWidth: number) => void;
+  zenMode?: boolean;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -14,6 +15,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   sidebarOpen,
   sidebarWidth = 280,
   onResizeSidebar,
+  zenMode = false,
 }) => {
   const [isResizing, setIsResizing] = useState(false);
   const startXRef = useRef(0);
@@ -67,7 +69,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   return (
     <div
-      className={`app-shell ${sidebarOpen ? "sidebar-open" : "sidebar-collapsed"} ${isResizing ? "resizing-sidebar" : ""}`}
+      className={`app-shell ${sidebarOpen ? "sidebar-open" : "sidebar-collapsed"} ${isResizing ? "resizing-sidebar" : ""} ${zenMode ? "zen-mode" : ""}`}
     >
       <aside className="sidebar-container">
         {sidebar}

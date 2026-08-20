@@ -7,6 +7,7 @@ import {
   Edit2,
   FolderInput,
   Trash2,
+  Maximize2,
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
 import { Button } from "../common/Button";
@@ -16,6 +17,7 @@ interface TopBarProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   onOpenSettings: () => void;
+  onToggleZenMode?: () => void;
   onSave: () => void;
   canSave: boolean;
   onRename: () => void;
@@ -28,6 +30,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   sidebarOpen,
   onToggleSidebar,
   onOpenSettings,
+  onToggleZenMode,
   onSave,
   canSave,
   onRename,
@@ -119,6 +122,13 @@ export const TopBar: React.FC<TopBarProps> = ({
             </div>
           </>
         )}
+
+        <IconButton
+          icon={<Maximize2 size={18} />}
+          label="专注模式 (Esc 退出)"
+          onClick={onToggleZenMode}
+          size="sm"
+        />
 
         <IconButton
           icon={<SettingsIcon size={18} />}
