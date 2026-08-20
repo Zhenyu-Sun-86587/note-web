@@ -144,13 +144,19 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
         const closeChar = PAIR_MAP[openChar];
 
         if (!range.collapsed) {
-          e.preventDefault();
-          const selectedText = range.toString();
-          document.execCommand(
-            "insertText",
-            false,
-            `${openChar}${selectedText}${closeChar}`,
-          );
+          if (
+            range.startContainer === range.endContainer &&
+            range.startContainer.nodeType === Node.TEXT_NODE
+          ) {
+            e.preventDefault();
+            const selectedText = range.toString();
+            document.execCommand(
+              "insertText",
+              false,
+              `${openChar}${selectedText}${closeChar}`,
+            );
+            return;
+          }
           return;
         }
 

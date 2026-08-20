@@ -18,21 +18,36 @@ interface SettingsDialogProps {
 
 const EDITOR_FONT_PRESETS: { label: string; value: string }[] = [
   {
-    label: "衬线体 (Serif)",
-    value: '"Georgia", "Cambria", "Times New Roman", serif',
-  },
-  {
-    label: "无衬线体 (Sans)",
+    label: "中文无衬线 (CJK Sans)",
     value:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif',
   },
   {
-    label: "Maple Mono CN NF",
+    label: "中文衬线 (CJK Serif)",
+    value:
+      '"Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", "Noto Serif SC", serif',
+  },
+  {
+    label: "中文等宽 / 编程 (CJK Mono)",
+    value:
+      '"Maple Mono CN NF", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Microsoft YaHei Mono", ui-monospace, monospace',
+  },
+  {
+    label: "Maple Mono CN NF (本机已安装)",
     value:
       '"Maple Mono CN NF", "Maple Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   },
   {
-    label: "等宽字体 (Mono)",
+    label: "西文衬线 (Western Serif)",
+    value: '"Georgia", "Cambria", "Times New Roman", serif',
+  },
+  {
+    label: "西文无衬线 (Western Sans)",
+    value:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  },
+  {
+    label: "西文等宽 (Western Mono)",
     value:
       'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
   },
@@ -40,26 +55,30 @@ const EDITOR_FONT_PRESETS: { label: string; value: string }[] = [
 
 const UI_FONT_PRESETS: { label: string; value: string }[] = [
   {
-    label: "系统默认 (System)",
+    label: "系统默认 (System CJK)",
     value:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif',
   },
   {
     label: "现代无衬线 (Sans)",
-    value: '"Inter", "Helvetica Neue", Arial, sans-serif',
+    value:
+      '"Inter", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", Arial, sans-serif',
   },
   {
-    label: "Maple Mono CN NF",
-    value:
-      '"Maple Mono CN NF", "Maple Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    label: "Maple Mono CN NF (本机已安装)",
+    value: '"Maple Mono CN NF", "Maple Mono", ui-monospace, monospace',
   },
 ];
 
 const MONO_FONT_PRESETS: { label: string; value: string }[] = [
   {
-    label: "Maple Mono CN NF",
+    label: "中文等宽 (CJK Mono)",
     value:
-      '"Maple Mono CN NF", "Maple Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      '"Maple Mono CN NF", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Microsoft YaHei Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  },
+  {
+    label: "Maple Mono CN NF (本机已安装)",
+    value: '"Maple Mono CN NF", "Maple Mono", ui-monospace, monospace',
   },
   {
     label: "系统等宽 (System Mono)",
@@ -377,6 +396,17 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   }}
                 />
               )}
+            </div>
+            <div
+              className="settings-hint"
+              style={{
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                marginTop: "6px",
+                lineHeight: "1.4",
+              }}
+            >
+              提示：特定字体（如 Maple Mono CN NF）需在本机操作系统中安装后方可直接渲染。
             </div>
           </div>
         </div>

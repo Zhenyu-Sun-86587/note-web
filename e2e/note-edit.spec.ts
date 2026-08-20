@@ -2,41 +2,68 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { test, expect } from "@playwright/test";
 
-const fixturePath = path.resolve(process.cwd(), "test-vault/inbox/welcome.md");
-let originalContent: string | null = null;
+const welcomeFixturePath = path.resolve(
+  process.cwd(),
+  "test-vault/inbox/welcome.md",
+);
+const exampleFixturePath = path.resolve(
+  process.cwd(),
+  "test-vault/projects/example.md",
+);
+
+let originalWelcomeContent: string | null = null;
+let originalExampleContent: string | null = null;
 
 test.beforeAll(() => {
-  if (fs.existsSync(fixturePath)) {
-    originalContent = fs.readFileSync(fixturePath, "utf8");
+  if (fs.existsSync(welcomeFixturePath)) {
+    originalWelcomeContent = fs.readFileSync(welcomeFixturePath, "utf8");
+  }
+  if (fs.existsSync(exampleFixturePath)) {
+    originalExampleContent = fs.readFileSync(exampleFixturePath, "utf8");
   }
 });
 
 test.afterEach(() => {
-  if (originalContent !== null && fs.existsSync(fixturePath)) {
-    fs.writeFileSync(fixturePath, originalContent, "utf8");
-  }
-  // Clean up any test created files in test-vault if created
-  const copyFile = path.resolve(process.cwd(), "test-vault/projects/welcome.md");
-  if (fs.existsSync(copyFile)) {
-    fs.unlinkSync(copyFile);
-  }
-  const copyFile2 = path.resolve(process.cwd(), "test-vault/projects/welcome copy.md");
-  if (fs.existsSync(copyFile2)) {
-    fs.unlinkSync(copyFile2);
-  }
-  const renamedFolder = path.resolve(process.cwd(), "test-vault/renamed_projects");
+  // 1. If renamed_projects exists, restore to projects
+  const renamedFolder = path.resolve(
+    process.cwd(),
+    "test-vault/renamed_projects",
+  );
+  const origProjects = path.resolve(process.cwd(), "test-vault/projects");
   if (fs.existsSync(renamedFolder)) {
-    // move back to projects if it was renamed
-    const origProjects = path.resolve(process.cwd(), "test-vault/projects");
     if (!fs.existsSync(origProjects)) {
       fs.renameSync(renamedFolder, origProjects);
     } else {
       fs.rmSync(renamedFolder, { recursive: true, force: true });
     }
   }
+
+  // 2. Restore tracked fixtures
+  if (originalWelcomeContent !== null && fs.existsSync(welcomeFixturePath)) {
+    fs.writeFileSync(welcomeFixturePath, originalWelcomeContent, "utf8");
+  }
+  if (originalExampleContent !== null && fs.existsSync(exampleFixturePath)) {
+    fs.writeFileSync(exampleFixturePath, originalExampleContent, "utf8");
+  }
+
+  // 3. Clean up any created copy files
+  const copyFile = path.resolve(
+    process.cwd(),
+    "test-vault/projects/welcome.md",
+  );
+  if (fs.existsSync(copyFile)) {
+    fs.unlinkSync(copyFile);
+  }
+  const copyFile2 = path.resolve(
+    process.cwd(),
+    "test-vault/projects/welcome copy.md",
+  );
+  if (fs.existsSync(copyFile2)) {
+    fs.unlinkSync(copyFile2);
+  }
 });
 
-test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
+test.describe("Note Web E2E Suite", () => {
   test("loads welcome.md, edits content, autosaves, and persists after reload", async ({
     page,
   }) => {
@@ -82,14 +109,19 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
 
     // Insert many lines to create a tall scrollable document
     await editorContainer.click();
-    const fillerLines = Array.from({ length: 60 }, (_, i) => `Paragraph line ${i + 1}`).join("\n\n");
+    const fillerLines = Array.from(
+      { length: 60 },
+      (_, i) => `Paragraph line ${i + 1}`,
+    ).join("\n\n");
     await page.keyboard.insertText(`\n\n${fillerLines}\n`);
 
     const scrollContainer = page.locator(".vditor-ir");
     await expect(scrollContainer).toBeVisible();
 
     // Verify scroll height is greater than client height
-    const isScrollable = await scrollContainer.evaluate((el) => el.scrollHeight > el.clientHeight);
+    const isScrollable = await scrollContainer.evaluate(
+      (el) => el.scrollHeight > el.clientHeight,
+    );
     expect(isScrollable).toBe(true);
 
     // Perform scroll offset
@@ -97,7 +129,9 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
       el.scrollTop = 250;
     });
 
-    const currentScrollTop = await scrollContainer.evaluate((el) => el.scrollTop);
+    const currentScrollTop = await scrollContainer.evaluate(
+      (el) => el.scrollTop,
+    );
     expect(currentScrollTop).toBeGreaterThan(0);
   });
 
@@ -128,7 +162,8 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
 
     // Verify runtime style contains the updated font size
     const styleContent = await page.evaluate(
-      () => document.getElementById("note-web-runtime-settings")?.textContent || "",
+      () =>
+        document.getElementById("note-web-runtime-settings")?.textContent || "",
     );
     expect(styleContent).toContain("--editor-font-size: 20px");
   });
@@ -148,15 +183,21 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
 
     // Assert strong element exists in the live DOM without reload
     const boldEl = page.locator(".vditor-ir strong");
-    await expect(boldEl.filter({ hasText: "livebold" })).toBeVisible({ timeout: 5000 });
+    await expect(
+      boldEl.filter({ hasText: "livebold" }),
+    ).toBeVisible({ timeout: 5000 });
 
     // Test B: Toolbar Italic
-    const italicBtn = page.locator('.vditor-toolbar button[data-type="italic"]');
+    const italicBtn = page.locator(
+      '.vditor-toolbar button[data-type="italic"]',
+    );
     await italicBtn.click();
     await page.keyboard.type("liveitalic");
 
     const italicEl = page.locator(".vditor-ir em");
-    await expect(italicEl.filter({ hasText: "liveitalic" })).toBeVisible({ timeout: 5000 });
+    await expect(
+      italicEl.filter({ hasText: "liveitalic" }),
+    ).toBeVisible({ timeout: 5000 });
 
     // Test C: Collapsed caret + Ctrl+B in Chinese text
     await page.keyboard.press("End");
@@ -172,7 +213,9 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     await page.keyboard.press("Enter");
 
     const collapsedBoldEl = page.locator(".vditor-ir strong");
-    await expect(collapsedBoldEl.filter({ hasText: "细粒度" })).toBeVisible({ timeout: 5000 });
+    await expect(
+      collapsedBoldEl.filter({ hasText: "细粒度" }),
+    ).toBeVisible({ timeout: 5000 });
 
     // Test D: Manual Chinese adjacent bold text typing
     await page.keyboard.type("这是**中文加粗**测试");
@@ -180,7 +223,9 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     await page.keyboard.type("结束标记");
 
     const chineseBoldEl = page.locator(".vditor-ir strong");
-    await expect(chineseBoldEl.filter({ hasText: "中文加粗" })).toBeVisible({ timeout: 5000 });
+    await expect(
+      chineseBoldEl.filter({ hasText: "中文加粗" }),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test("auto-pairs () [] {} with exact placement, skip-closing, and selection wrapping", async ({
@@ -194,25 +239,40 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     await page.keyboard.press("End");
     await page.keyboard.press("Enter");
 
-    // Test A: Type ( then ) -> should skip close to ()
+    // Test A: Type ( then RoundText without typing ) -> should auto-close to (RoundText)
     await page.keyboard.press("(");
-    await page.keyboard.press(")");
     await page.keyboard.type("RoundText");
-    await expect(editorContainer).toContainText("()RoundText");
+    await expect(editorContainer).toContainText("(RoundText)");
 
-    // Test B: Type [ then ] -> should skip close to []
+    // Test B: Type [ then SquareText without typing ] -> should auto-close to [SquareText]
     await page.keyboard.press("Enter");
     await page.keyboard.press("[");
-    await page.keyboard.press("]");
     await page.keyboard.type("SquareText");
-    await expect(editorContainer).toContainText("[]SquareText");
+    await expect(editorContainer).toContainText("[SquareText]");
 
-    // Test C: Type { then } -> should skip close to {}
+    // Test C: Type { then CurlyText without typing } -> should auto-close to {CurlyText}
     await page.keyboard.press("Enter");
     await page.keyboard.press("{");
-    await page.keyboard.press("}");
     await page.keyboard.type("CurlyText");
-    await expect(editorContainer).toContainText("{}CurlyText");
+    await expect(editorContainer).toContainText("{CurlyText}");
+
+    // Test D: Skip close on )
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("(");
+    await page.keyboard.press(")");
+    await page.keyboard.type("SkipRound");
+    await expect(editorContainer).toContainText("()SkipRound");
+
+    // Test E: Selection wrap
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("wraptext");
+    await page.keyboard.down("Shift");
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press("ArrowLeft");
+    }
+    await page.keyboard.up("Shift");
+    await page.keyboard.press("(");
+    await expect(editorContainer).toContainText("(wraptext)");
   });
 
   test("supports mouse drag resizing of sidebar and persists width across reload", async ({
@@ -232,9 +292,15 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     expect(resizerBox).not.toBeNull();
 
     // Drag resizer to the right by ~60px
-    await page.mouse.move(resizerBox!.x + resizerBox!.width / 2, resizerBox!.y + 100);
+    await page.mouse.move(
+      resizerBox!.x + resizerBox!.width / 2,
+      resizerBox!.y + 100,
+    );
     await page.mouse.down();
-    await page.mouse.move(resizerBox!.x + resizerBox!.width / 2 + 60, resizerBox!.y + 100);
+    await page.mouse.move(
+      resizerBox!.x + resizerBox!.width / 2 + 60,
+      resizerBox!.y + 100,
+    );
     await page.mouse.up();
 
     // Verify resized width is greater than initial width
@@ -263,15 +329,22 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     // Verify context menu is open
     const contextMenu = page.locator(".file-context-menu");
     await expect(contextMenu).toBeVisible();
-    await expect(contextMenu.getByRole("menuitem", { name: "重命名" })).toBeVisible();
-    await expect(contextMenu.getByRole("menuitem", { name: "复制" })).toBeVisible();
+    await expect(
+      contextMenu.getByRole("menuitem", { name: "重命名" }),
+    ).toBeVisible();
+    await expect(
+      contextMenu.getByRole("menuitem", { name: "复制" }),
+    ).toBeVisible();
 
     // Click Copy in context menu
     await contextMenu.getByRole("menuitem", { name: "复制" }).click();
     await expect(contextMenu).not.toBeVisible();
 
     // Right click on projects folder
-    const folderItem = page.locator(".tree-folder").filter({ hasText: "projects" }).first();
+    const folderItem = page
+      .locator(".tree-folder")
+      .filter({ hasText: "projects" })
+      .first();
     await expect(folderItem).toBeVisible();
     await folderItem.click({ button: "right" });
 
@@ -286,7 +359,9 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     await expect(folderMenu).not.toBeVisible();
 
     // Verify pasted note appears in tree
-    await expect(page.locator(".tree-note").filter({ hasText: "welcome" })).toHaveCount(2, {
+    await expect(
+      page.locator(".tree-note").filter({ hasText: "welcome" }),
+    ).toHaveCount(2, {
       timeout: 5000,
     });
   });
@@ -299,22 +374,39 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     await expect(editorContainer).toBeVisible({ timeout: 10000 });
 
     // Open note in projects folder
-    const exampleNote = page.locator(".tree-note").filter({ hasText: "example" }).first();
+    const exampleNote = page
+      .locator(".tree-note")
+      .filter({ hasText: "example" })
+      .first();
     const isExampleVisible = await exampleNote.isVisible();
     if (!isExampleVisible) {
-      const projectsFolder = page.locator(".tree-folder").filter({ hasText: "projects" }).first();
+      const projectsFolder = page
+        .locator(".tree-folder")
+        .filter({ hasText: "projects" })
+        .first();
       await projectsFolder.click();
     }
     await expect(exampleNote).toBeVisible();
     await exampleNote.click();
+    await expect(page.locator(".topbar-path")).toContainText(
+      "projects/example.md",
+    );
+    await page.waitForTimeout(400);
+    const activeEditor = page.locator(".vditor-ir .vditor-reset");
+    await expect(activeEditor).toContainText("Project Example");
 
     // Edit content to make it dirty
-    const uniqueToken = `Flush-Token-${Date.now()}`;
-    await editorContainer.click();
-    await page.keyboard.type(`\n${uniqueToken}`);
+    const uniqueFlushToken = `Flush-Token-${Date.now()}`;
+    await activeEditor.click();
+    await page.keyboard.type(`\n${uniqueFlushToken}`);
+    await expect(activeEditor).toContainText(uniqueFlushToken);
+    await expect(page.locator(".statusbar")).toContainText("未保存");
 
-    // Right click projects folder to rename it
-    const projectsFolder = page.locator(".tree-folder").filter({ hasText: "projects" }).first();
+    // Right click projects folder to rename it immediately (forcing dirty flush)
+    const projectsFolder = page
+      .locator(".tree-folder")
+      .filter({ hasText: "projects" })
+      .first();
     await projectsFolder.click({ button: "right" });
     const contextMenu = page.locator(".file-context-menu");
     await expect(contextMenu).toBeVisible();
@@ -335,19 +427,54 @@ test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
     await expect(renameDialog).not.toBeVisible();
 
     // Verify folder was renamed without .md
-    await expect(page.locator(".tree-folder").filter({ hasText: "renamed_projects" })).toBeVisible({
+    await expect(
+      page.locator(".tree-folder").filter({ hasText: "renamed_projects" }),
+    ).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.locator(".tree-folder").filter({ hasText: "renamed_projects.md" })).not.toBeVisible();
+    await expect(
+      page
+        .locator(".tree-folder")
+        .filter({ hasText: "renamed_projects.md" }),
+    ).not.toBeVisible();
 
     // Verify open note path in TopBar is now renamed_projects/example.md
     const topBarPath = page.locator(".topbar-path");
     await expect(topBarPath).toContainText("renamed_projects/example.md");
 
+    // Verify the flushed token was persisted on disk in renamed_projects/example.md
+    const renamedExamplePath = path.resolve(
+      process.cwd(),
+      "test-vault/renamed_projects/example.md",
+    );
+    expect(fs.existsSync(renamedExamplePath)).toBe(true);
+    const diskContent = fs.readFileSync(renamedExamplePath, "utf8");
+    expect(diskContent).toContain(uniqueFlushToken);
+
+    // Edit again after folder rename to verify continuous autosave
+    const uniqueAfterToken = `After-Rename-Token-${Date.now()}`;
+    const remappedEditor = page.locator(".vditor-ir .vditor-reset");
+    await expect(remappedEditor).toContainText(uniqueFlushToken);
+    await page.waitForTimeout(400);
+    await remappedEditor.click();
+    await page.keyboard.type(`\n${uniqueAfterToken}`);
+    const statusBar = page.locator(".statusbar");
+    await expect(statusBar).toContainText("未保存", { timeout: 5000 });
+    await expect(statusBar).toContainText("已保存", { timeout: 8000 });
+
+    const updatedDiskContent = fs.readFileSync(renamedExamplePath, "utf8");
+    expect(updatedDiskContent).toContain(uniqueAfterToken);
+
     // Clean up folder rename back to projects
-    const renamedFolder = page.locator(".tree-folder").filter({ hasText: "renamed_projects" }).first();
+    const renamedFolder = page
+      .locator(".tree-folder")
+      .filter({ hasText: "renamed_projects" })
+      .first();
     await renamedFolder.click({ button: "right" });
-    await page.locator(".file-context-menu").getByRole("menuitem", { name: "重命名" }).click();
+    await page
+      .locator(".file-context-menu")
+      .getByRole("menuitem", { name: "重命名" })
+      .click();
     const revertDialog = page.getByRole("dialog");
     await revertDialog.locator('input[type="text"]').fill("projects");
     await revertDialog.getByRole("button", { name: "保存" }).click();

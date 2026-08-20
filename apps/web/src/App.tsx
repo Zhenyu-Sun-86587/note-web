@@ -184,11 +184,11 @@ export default function App() {
 
   // Flush helper that aborts if dirty save fails
   const flushCurrentNote = useCallback(async (): Promise<boolean> => {
-    if (!isDirty) {
+    if (!openNoteRef.current) {
       return true;
     }
     return saveNow();
-  }, [isDirty, saveNow]);
+  }, [saveNow]);
 
   // Switch note safely flushing dirty changes
   const switchNote = useCallback(
@@ -308,21 +308,23 @@ export default function App() {
   const handleRenameSubmit = async (newPath: string) => {
     if (!renameTarget) return;
 
+    const currentOpenNote = openNoteRef.current;
+
     if (renameTarget.type === "note") {
-      if (openNote?.path === renameTarget.path) {
+      if (currentOpenNote?.path === renameTarget.path) {
         if (!(await flushCurrentNote())) {
           return;
         }
       }
       await renameOrMoveNote(renameTarget.path, newPath);
-      if (openNote?.path === renameTarget.path) {
+      if (currentOpenNote?.path === renameTarget.path) {
         setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
       }
     } else {
       const affectsOpenNote =
-        openNote !== null &&
-        (openNote.path === renameTarget.path ||
-          openNote.path.startsWith(`${renameTarget.path}/`));
+        currentOpenNote !== null &&
+        (currentOpenNote.path === renameTarget.path ||
+          currentOpenNote.path.startsWith(`${renameTarget.path}/`));
 
       if (affectsOpenNote) {
         if (!(await flushCurrentNote())) {
@@ -333,11 +335,11 @@ export default function App() {
       await renameFolder(renameTarget.path, newPath);
       // Remap openNote path if it is inside renamed folder
       if (
-        openNote &&
-        (openNote.path === renameTarget.path ||
-          openNote.path.startsWith(`${renameTarget.path}/`))
+        currentOpenNote &&
+        (currentOpenNote.path === renameTarget.path ||
+          currentOpenNote.path.startsWith(`${renameTarget.path}/`))
       ) {
-        const suffix = openNote.path.slice(renameTarget.path.length);
+        const suffix = currentOpenNote.path.slice(renameTarget.path.length);
         setOpenNote((prev) =>
           prev ? { ...prev, path: `${newPath}${suffix}` } : null,
         );

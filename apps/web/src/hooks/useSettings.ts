@@ -18,15 +18,16 @@ export const SETTINGS_KEY = "note-web-settings-v1";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
-  editorFont: '"Georgia", "Cambria", "Times New Roman", serif',
+  editorFont:
+    '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", sans-serif',
   editorFontSize: 16,
   editorLineHeight: 1.75,
   editorMaxWidth: 900,
   editorPaddingX: 48,
   uiFont:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif',
   monoFont:
-    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    '"Maple Mono CN NF", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
   sidebarWidth: 280,
 };
 
