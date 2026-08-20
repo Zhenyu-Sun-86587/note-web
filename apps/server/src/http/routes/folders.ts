@@ -32,8 +32,8 @@ export function createFoldersRouter(vaultRoot: string): Router {
   router.delete(
     "/folder",
     asyncHandler(async (req, res) => {
-      const folderPath = req.query.path as string;
-      if (!folderPath) {
+      const folderPath = req.query.path;
+      if (typeof folderPath !== "string") {
         sendError(res, 400, "INVALID_PATH", "Query parameter 'path' is required");
         return;
       }

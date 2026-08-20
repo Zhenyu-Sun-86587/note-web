@@ -140,5 +140,11 @@ describe("Notes API & CRUD", () => {
     expect(
       fs.existsSync(path.join(ctx.vaultRoot, "projects", "newfolder")),
     ).toBe(false);
+
+    // Should forbid deleting vault root
+    const delRootRes = await request(ctx.app)
+      .delete("/api/folder?path=")
+      .expect(403);
+    expect(delRootRes.body.error.code).toBe("ACCESS_DENIED");
   });
 });

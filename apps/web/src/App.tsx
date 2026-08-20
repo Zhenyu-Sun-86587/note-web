@@ -47,6 +47,8 @@ export default function App() {
   const openNoteRef = useRef(openNote);
   openNoteRef.current = openNote;
 
+  const hasAutoOpenedRef = useRef(false);
+
   // Dialogs state
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -61,6 +63,8 @@ export default function App() {
     type: "note" | "folder";
     path: string;
   } | null>(null);
+
+  const isDirty = openNote !== null && draftContent !== openNote.content;
 
   // Load tree
   const loadTree = useCallback(async () => {
@@ -96,9 +100,9 @@ export default function App() {
     [],
   );
 
-  // Auto-open first note on first load if available
+  // Auto-open first note only on first load
   useEffect(() => {
-    if (tree.length > 0 && !openNote) {
+    if (tree.length > 0 && !openNote && !hasAutoOpenedRef.current) {
       function findFirstNote(items: TreeNode[]): string | null {
         for (const item of items) {
           if (item.type === "note") return item.path;
@@ -111,38 +115,41 @@ export default function App() {
       }
       const firstNote = findFirstNote(tree);
       if (firstNote) {
+        hasAutoOpenedRef.current = true;
         handleOpenNote(firstNote);
       }
     }
   }, [tree, openNote, handleOpenNote]);
 
   // Autosave hook
-  const { status: saveStatus, saveNow, setStatus } = useAutosave({
+  const {
+    status: saveStatus,
+    saveNow,
+    resetStatus,
+    setStatus,
+  } = useAutosave({
     path: openNote?.path ?? null,
     content: draftContent,
     revision: openNote?.revision ?? null,
-    enabled: Boolean(openNote),
+    enabled: Boolean(openNote) && isDirty,
     onSaved: (doc) => {
       setOpenNote(doc);
     },
   });
 
-  // Switch note safely saving dirty changes
+  // Switch note safely flushing dirty changes
   const switchNote = useCallback(
     async (targetPath: string) => {
       if (openNote?.path === targetPath) return;
 
-      if (
-        openNote &&
-        saveStatus === "dirty" &&
-        draftContentRef.current !== openNote.content
-      ) {
+      if (isDirty) {
         await saveNow();
       }
 
+      resetStatus("idle");
       await handleOpenNote(targetPath);
     },
-    [openNote, saveStatus, saveNow, handleOpenNote],
+    [openNote, isDirty, saveNow, resetStatus, handleOpenNote],
   );
 
   // Folder expand toggle
@@ -157,6 +164,18 @@ export default function App() {
       return next;
     });
   }, []);
+
+  // Dirty page exit confirmation
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   // Window Focus Refresh
   useWindowFocusRefresh(async () => {
@@ -187,7 +206,7 @@ export default function App() {
       const doc = await fetchNote(openNote.path);
       setOpenNote(doc);
       setDraftContent(doc.content);
-      setStatus("idle");
+      resetStatus("idle");
     } catch (err: unknown) {
       // eslint-disable-next-line no-alert
       alert(`重新加载失败: ${err instanceof Error ? err.message : "未知错误"}`);
@@ -202,7 +221,7 @@ export default function App() {
       await loadTree();
       setOpenNote(newDoc);
       setDraftContent(newDoc.content);
-      setStatus("idle");
+      resetStatus("idle");
     } catch (err: unknown) {
       // eslint-disable-next-line no-alert
       alert(
@@ -213,8 +232,12 @@ export default function App() {
 
   // CRUD actions
   const handleCreateNote = async (fullPath: string) => {
+    if (isDirty) {
+      await saveNow();
+    }
     const newDoc = await createNote(fullPath, "");
     await loadTree();
+    resetStatus("idle");
     setOpenNote(newDoc);
     setDraftContent("");
     const dir = getDirname(fullPath);
@@ -231,6 +254,9 @@ export default function App() {
 
   const handleRenameNote = async (newPath: string) => {
     if (!openNote) return;
+    if (isDirty) {
+      await saveNow();
+    }
     await renameOrMoveNote(openNote.path, newPath);
     await loadTree();
     setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
@@ -238,6 +264,9 @@ export default function App() {
 
   const handleMoveNote = async (newPath: string) => {
     if (!openNote) return;
+    if (isDirty) {
+      await saveNow();
+    }
     await renameOrMoveNote(openNote.path, newPath);
     await loadTree();
     setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
@@ -260,6 +289,7 @@ export default function App() {
     if (deleteTarget.type === "note") {
       await deleteNote(deleteTarget.path);
       if (openNote?.path === deleteTarget.path) {
+        resetStatus("idle");
         setOpenNote(null);
         setDraftContent("");
       }
@@ -283,6 +313,8 @@ export default function App() {
       setNewNoteOpen(true);
     },
   });
+
+  const effectiveSaveStatus = isDirty && saveStatus === "idle" ? "dirty" : saveStatus;
 
   return (
     <AppShell
@@ -348,7 +380,7 @@ export default function App() {
       />
 
       <StatusBar
-        saveStatus={saveStatus}
+        saveStatus={effectiveSaveStatus}
         content={draftContent}
         isNoteOpen={Boolean(openNote)}
       />

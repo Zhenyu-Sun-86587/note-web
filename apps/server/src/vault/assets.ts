@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { VaultError } from "./paths.js";
+import { VaultError, assertRealPathInsideVault } from "./paths.js";
 
 export interface AssetUploadResult {
   name: string;
@@ -53,6 +53,7 @@ export async function saveAsset(
   const targetDirFull = path.join(vaultRoot, "attachments", year, month);
 
   await fs.promises.mkdir(targetDirFull, { recursive: true });
+  await assertRealPathInsideVault(vaultRoot, targetDirFull, "existing");
 
   const fileName = `${Date.now()}-${sanitized}`;
   const vaultPath = path.posix.join(targetDirRel, fileName);

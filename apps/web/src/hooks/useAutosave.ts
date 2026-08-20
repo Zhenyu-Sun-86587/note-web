@@ -32,69 +32,95 @@ export function useAutosave({
   const latestPathRef = useRef(path);
   latestPathRef.current = path;
 
-  const savingRef = useRef(false);
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
+
+  const onConflictRef = useRef(onConflict);
+  onConflictRef.current = onConflict;
+
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const inFlightPromiseRef = useRef<Promise<boolean> | null>(null);
   const saveAgainRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const performSave = useCallback(async (): Promise<boolean> => {
     const currentPath = latestPathRef.current;
-    const currentContent = latestContentRef.current;
     const currentRevision = latestRevisionRef.current;
 
     if (!currentPath || currentRevision === null) {
       return false;
     }
 
-    if (savingRef.current) {
+    if (inFlightPromiseRef.current) {
       saveAgainRef.current = true;
-      return false;
+      return inFlightPromiseRef.current;
     }
 
-    savingRef.current = true;
     setStatus("saving");
 
-    try {
-      const doc = await saveNote(currentPath, currentContent, currentRevision);
-      savingRef.current = false;
-      setStatus("saved");
-      onSaved?.(doc);
+    const savePromise = (async () => {
+      try {
+        let shouldLoop = true;
+        let lastResult = true;
 
-      if (saveAgainRef.current) {
+        while (shouldLoop) {
+          shouldLoop = false;
+          saveAgainRef.current = false;
+
+          const p = latestPathRef.current;
+          const c = latestContentRef.current;
+          const r = latestRevisionRef.current;
+
+          if (!p || r === null) {
+            lastResult = false;
+            break;
+          }
+
+          const doc = await saveNote(p, c, r);
+          setStatus("saved");
+          onSavedRef.current?.(doc);
+
+          if (saveAgainRef.current) {
+            shouldLoop = true;
+          }
+        }
+        return lastResult;
+      } catch (err: unknown) {
         saveAgainRef.current = false;
-        return performSave();
-      }
-      return true;
-    } catch (err: unknown) {
-      savingRef.current = false;
-      saveAgainRef.current = false;
 
-      if (err instanceof ClientError && err.statusCode === 409) {
-        setStatus("conflict");
-        onConflict?.(err);
-      } else {
-        setStatus("error");
-        onError?.(err as Error);
+        if (err instanceof ClientError && err.statusCode === 409) {
+          setStatus("conflict");
+          onConflictRef.current?.(err);
+        } else {
+          setStatus("error");
+          onErrorRef.current?.(err as Error);
+        }
+        return false;
+      } finally {
+        inFlightPromiseRef.current = null;
       }
-      return false;
-    }
-  }, [onSaved, onConflict, onError]);
+    })();
+
+    inFlightPromiseRef.current = savePromise;
+    return savePromise;
+  }, []);
 
   // Debounced auto-save effect
   useEffect(() => {
     if (!enabled || !path || revision === null) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       return;
     }
 
-    if (status !== "conflict") {
-      setStatus("dirty");
-    }
+    setStatus((prev) => (prev === "conflict" ? "conflict" : "dirty"));
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
-    }
-
-    if (status === "conflict") {
-      return;
     }
 
     debounceTimerRef.current = setTimeout(() => {
@@ -106,11 +132,16 @@ export function useAutosave({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [content, enabled, path, revision, performSave, status]);
+  }, [content, enabled, path, revision, performSave]);
 
   const saveNow = useCallback(async (): Promise<boolean> => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    if (inFlightPromiseRef.current) {
+      saveAgainRef.current = true;
+      return inFlightPromiseRef.current;
     }
     return performSave();
   }, [performSave]);
@@ -118,13 +149,16 @@ export function useAutosave({
   const resetStatus = useCallback((newStatus: SaveStatus = "idle") => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
+    saveAgainRef.current = false;
     setStatus(newStatus);
   }, []);
 
   return {
     status,
     saveNow,
+    flush: saveNow,
     resetStatus,
     setStatus,
   };

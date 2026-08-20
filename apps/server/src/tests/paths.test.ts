@@ -82,6 +82,29 @@ describe("vault/paths", () => {
         }
       }
     });
+
+    it("rejects ancestor symlinks escaping vault root", async () => {
+      const outsideDir = await fs.promises.mkdtemp(
+        path.join(ctx.vaultRoot, "../outside-vault-"),
+      );
+      await fs.promises.writeFile(
+        path.join(outsideDir, "secret.md"),
+        "secret content",
+      );
+
+      const escapeSymlink = path.join(ctx.vaultRoot, "escape");
+      await fs.promises.symlink(outsideDir, escapeSymlink);
+
+      await expect(
+        resolveExistingNotePath(ctx.vaultRoot, "escape/secret.md"),
+      ).rejects.toThrow(VaultError);
+
+      await expect(
+        resolveNewNotePath(ctx.vaultRoot, "escape/new.md"),
+      ).rejects.toThrow(VaultError);
+
+      await fs.promises.rm(outsideDir, { recursive: true, force: true });
+    });
   });
 
   describe("resolveNewNotePath", () => {

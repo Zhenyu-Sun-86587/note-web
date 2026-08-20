@@ -17,6 +17,15 @@ export async function deleteFolder(
   vaultRoot: string,
   relativePath: string,
 ): Promise<void> {
+  const normalized = relativePath ? relativePath.replaceAll("\\", "/").trim() : "";
+  if (!normalized || normalized === "." || normalized === "/") {
+    throw new VaultError(
+      "ACCESS_DENIED",
+      "Cannot delete vault root folder",
+      403,
+    );
+  }
+
   const { fullPath } = await resolveExistingFolderPath(vaultRoot, relativePath);
 
   const entries = await fs.promises.readdir(fullPath);

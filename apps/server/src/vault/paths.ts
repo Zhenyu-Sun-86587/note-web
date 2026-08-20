@@ -43,6 +43,48 @@ export function isPathInsideVault(vaultRoot: string, targetPath: string): boolea
   return !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
+export async function assertRealPathInsideVault(
+  vaultRoot: string,
+  targetPath: string,
+  mode: "existing" | "new",
+): Promise<void> {
+  let realVault: string;
+  try {
+    realVault = await fs.promises.realpath(vaultRoot);
+  } catch (err: unknown) {
+    throw new VaultError("VAULT_NOT_FOUND", "Vault root not found on disk", 500);
+  }
+
+  if (mode === "existing") {
+    let realTarget: string;
+    try {
+      realTarget = await fs.promises.realpath(targetPath);
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new VaultError("NOTE_NOT_FOUND", "File not found", 404);
+      }
+      throw err;
+    }
+    if (!isPathInsideVault(realVault, realTarget)) {
+      throw new VaultError("ACCESS_DENIED", "Target path escapes vault root", 403);
+    }
+  } else {
+    const parentDir = path.dirname(targetPath);
+    let realParent: string;
+    try {
+      realParent = await fs.promises.realpath(parentDir);
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new VaultError("FOLDER_NOT_FOUND", "Parent folder does not exist", 404);
+      }
+      throw err;
+    }
+    if (!isPathInsideVault(realVault, realParent)) {
+      throw new VaultError("ACCESS_DENIED", "Parent folder escapes vault root", 403);
+    }
+  }
+}
+
 export async function resolveExistingNotePath(
   vaultRoot: string,
   input: string,
@@ -71,6 +113,8 @@ export async function resolveExistingNotePath(
     }
     throw err;
   }
+
+  await assertRealPathInsideVault(vaultRoot, fullPath, "existing");
 
   return { fullPath, relativePath: normalized };
 }
@@ -106,13 +150,14 @@ export async function resolveNewNotePath(
     throw err;
   }
 
+  await assertRealPathInsideVault(vaultRoot, fullPath, "new");
+
   // Check target does not exist
   try {
     await fs.promises.lstat(fullPath);
     throw new VaultError("NOTE_ALREADY_EXISTS", "Note already exists", 409);
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      // Good, it does not exist
       return { fullPath, relativePath: normalized };
     }
     throw err;
@@ -124,6 +169,7 @@ export async function resolveExistingFolderPath(
   input: string,
 ): Promise<{ fullPath: string; relativePath: string }> {
   if (!input || input === "." || input === "/") {
+    await assertRealPathInsideVault(vaultRoot, vaultRoot, "existing");
     return { fullPath: vaultRoot, relativePath: "" };
   }
 
@@ -147,6 +193,8 @@ export async function resolveExistingFolderPath(
     }
     throw err;
   }
+
+  await assertRealPathInsideVault(vaultRoot, fullPath, "existing");
 
   return { fullPath, relativePath: normalized };
 }
@@ -176,6 +224,8 @@ export async function resolveNewFolderPath(
     }
     throw err;
   }
+
+  await assertRealPathInsideVault(vaultRoot, fullPath, "new");
 
   try {
     await fs.promises.lstat(fullPath);
@@ -212,6 +262,8 @@ export async function resolveAssetPath(
     }
     throw err;
   }
+
+  await assertRealPathInsideVault(vaultRoot, fullPath, "existing");
 
   return { fullPath, relativePath: normalized };
 }

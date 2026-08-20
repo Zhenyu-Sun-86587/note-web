@@ -12,7 +12,7 @@ services:
       FONTS_DIR: /config/fonts
     volumes:
       - /srv/notes:/vault
-      - ./config:/config:ro
+      - ../config:/config:ro
     ports:
       - "127.0.0.1:3000:3000"
     healthcheck:
