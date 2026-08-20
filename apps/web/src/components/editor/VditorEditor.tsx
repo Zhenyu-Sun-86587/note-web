@@ -13,6 +13,14 @@ interface VditorEditorProps {
   onChange: (value: string) => void;
 }
 
+const PAIR_MAP: Record<string, string> = {
+  "(": ")",
+  "[": "]",
+  "{": "}",
+};
+
+const CLOSING_SET = new Set([")", "]", "}"]);
+
 export const VditorEditor: React.FC<VditorEditorProps> = ({
   notePath,
   value,
@@ -119,7 +127,7 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
       });
     };
 
-    // Auto-pair () and skip-close handling
+    // Auto-pair () [] {} and skip-close handling
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.isComposing) return;
 
@@ -127,25 +135,32 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
       if (!target || !hostEl?.contains(target)) return;
       if (!target.closest(".vditor-reset")) return;
 
-      if (e.key === "(" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (PAIR_MAP[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const selection = window.getSelection();
         if (!selection || selection.rangeCount === 0) return;
         const range = selection.getRangeAt(0);
 
+        const openChar = e.key;
+        const closeChar = PAIR_MAP[openChar];
+
         if (!range.collapsed) {
           e.preventDefault();
           const selectedText = range.toString();
-          document.execCommand("insertText", false, `(${selectedText})`);
+          document.execCommand(
+            "insertText",
+            false,
+            `${openChar}${selectedText}${closeChar}`,
+          );
           return;
         }
 
         e.preventDefault();
-        document.execCommand("insertText", false, "()");
+        document.execCommand("insertText", false, `${openChar}${closeChar}`);
         selection.modify("move", "backward", "character");
         return;
       }
 
-      if (e.key === ")" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (CLOSING_SET.has(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const selection = window.getSelection();
         if (!selection || !selection.isCollapsed || !selection.focusNode) return;
 
@@ -153,7 +168,7 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
         if (node.nodeType === Node.TEXT_NODE) {
           const text = node.textContent || "";
           const offset = selection.focusOffset;
-          if (offset < text.length && text[offset] === ")") {
+          if (offset < text.length && text[offset] === e.key) {
             e.preventDefault();
             selection.modify("move", "forward", "character");
           }

@@ -15,9 +15,18 @@ test.afterEach(() => {
   if (originalContent !== null && fs.existsSync(fixturePath)) {
     fs.writeFileSync(fixturePath, originalContent, "utf8");
   }
+  // Clean up any test created files in test-vault if created
+  const copyFile = path.resolve(process.cwd(), "test-vault/projects/welcome.md");
+  if (fs.existsSync(copyFile)) {
+    fs.unlinkSync(copyFile);
+  }
+  const copyFile2 = path.resolve(process.cwd(), "test-vault/projects/welcome copy.md");
+  if (fs.existsSync(copyFile2)) {
+    fs.unlinkSync(copyFile2);
+  }
 });
 
-test.describe("Note Web E2E UX Pass 2 Suite", () => {
+test.describe("Note Web E2E UX Pass 3 Suite", () => {
   test("loads welcome.md, edits content, autosaves, and persists after reload", async ({
     page,
   }) => {
@@ -114,7 +123,7 @@ test.describe("Note Web E2E UX Pass 2 Suite", () => {
     expect(styleContent).toContain("--editor-font-size: 20px");
   });
 
-  test("renders Bold, Italic, Strike, and Inline Code live in Vditor IR without page reload", async ({
+  test("renders Bold, Italic, Strike, and Inline Code live in Vditor IR without page reload (including adjacent Chinese characters)", async ({
     page,
   }) => {
     await page.goto("/");
@@ -138,9 +147,18 @@ test.describe("Note Web E2E UX Pass 2 Suite", () => {
 
     const italicEl = page.locator(".vditor-ir em");
     await expect(italicEl.filter({ hasText: "liveitalic" })).toBeVisible({ timeout: 5000 });
+
+    // Test C: Chinese adjacent bold text typing
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("这是**中文加粗**测试");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("结束标记");
+
+    const chineseBoldEl = page.locator(".vditor-ir strong");
+    await expect(chineseBoldEl.filter({ hasText: "中文加粗" })).toBeVisible({ timeout: 5000 });
   });
 
-  test("auto-pairs parenthesis ( to () with cursor placed between", async ({
+  test("auto-pairs () [] {} with cursor placed between, supports selection wrap and skip closing", async ({
     page,
   }) => {
     await page.goto("/");
@@ -150,13 +168,23 @@ test.describe("Note Web E2E UX Pass 2 Suite", () => {
     await editorContainer.click();
     await page.keyboard.press("End");
     await page.keyboard.press("Enter");
-    // Type "("
-    await page.keyboard.press("(");
-    // Type inner text "autopairtest"
-    await page.keyboard.type("autopairtest");
 
-    // The editor text should have (autopairtest)
-    await expect(editorContainer).toContainText("(autopairtest)");
+    // Type "(" -> ()
+    await page.keyboard.press("(");
+    await page.keyboard.type("round");
+    await expect(editorContainer).toContainText("(round)");
+
+    // Type "[" -> []
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("[");
+    await page.keyboard.type("square");
+    await expect(editorContainer).toContainText("[square]");
+
+    // Type "{" -> {}
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("{");
+    await page.keyboard.type("curly");
+    await expect(editorContainer).toContainText("{curly}");
   });
 
   test("supports mouse drag resizing of sidebar and persists width across reload", async ({
@@ -190,5 +218,48 @@ test.describe("Note Web E2E UX Pass 2 Suite", () => {
 
     const reloadedBox = await sidebar.boundingBox();
     expect(reloadedBox!.width).toBeGreaterThan(initialWidth + 30);
+  });
+
+  test("provides right-click context menu on notes and folders (copy, paste duplicate)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const editorContainer = page.locator(".vditor-ir .vditor-reset");
+    await expect(editorContainer).toBeVisible({ timeout: 10000 });
+
+    // Right click on note item in file tree
+    const noteItem = page.locator(".tree-note").first();
+    await expect(noteItem).toBeVisible();
+    await noteItem.click({ button: "right" });
+
+    // Verify context menu is open
+    const contextMenu = page.locator(".file-context-menu");
+    await expect(contextMenu).toBeVisible();
+    await expect(contextMenu.getByRole("menuitem", { name: "重命名" })).toBeVisible();
+    await expect(contextMenu.getByRole("menuitem", { name: "复制" })).toBeVisible();
+
+    // Click Copy in context menu
+    await contextMenu.getByRole("menuitem", { name: "复制" }).click();
+    await expect(contextMenu).not.toBeVisible();
+
+    // Right click on projects folder
+    const folderItem = page.locator(".tree-folder").filter({ hasText: "projects" }).first();
+    await expect(folderItem).toBeVisible();
+    await folderItem.click({ button: "right" });
+
+    // Verify folder context menu has Paste button
+    const folderMenu = page.locator(".file-context-menu");
+    await expect(folderMenu).toBeVisible();
+    const pasteBtn = folderMenu.getByRole("menuitem", { name: "粘贴笔记" });
+    await expect(pasteBtn).toBeVisible();
+
+    // Paste note into projects folder
+    await pasteBtn.click();
+    await expect(folderMenu).not.toBeVisible();
+
+    // Verify pasted note appears in tree
+    await expect(page.locator(".tree-note").filter({ hasText: "welcome" })).toHaveCount(2, {
+      timeout: 5000,
+    });
   });
 });

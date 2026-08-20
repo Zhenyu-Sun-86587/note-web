@@ -123,7 +123,7 @@ describe("Notes API & CRUD", () => {
     ).toBe(false);
   });
 
-  it("Folder CRUD: POST and DELETE folder", async () => {
+  it("Folder CRUD: POST, PATCH and DELETE folder", async () => {
     await request(ctx.app)
       .post("/api/folder")
       .send({ path: "projects/newfolder" })
@@ -133,18 +133,39 @@ describe("Notes API & CRUD", () => {
       fs.existsSync(path.join(ctx.vaultRoot, "projects", "newfolder")),
     ).toBe(true);
 
-    await request(ctx.app)
-      .delete("/api/folder?path=projects/newfolder")
-      .expect(204);
+    // PATCH folder rename
+    const patchRes = await request(ctx.app)
+      .patch("/api/folder?path=projects/newfolder")
+      .send({ newPath: "projects/renamedfolder" })
+      .expect(200);
+    expect(patchRes.body.ok).toBe(true);
+    expect(patchRes.body.newPath).toBe("projects/renamedfolder");
 
     expect(
       fs.existsSync(path.join(ctx.vaultRoot, "projects", "newfolder")),
     ).toBe(false);
+    expect(
+      fs.existsSync(path.join(ctx.vaultRoot, "projects", "renamedfolder")),
+    ).toBe(true);
 
-    // Should forbid deleting vault root
+    await request(ctx.app)
+      .delete("/api/folder?path=projects/renamedfolder")
+      .expect(204);
+
+    expect(
+      fs.existsSync(path.join(ctx.vaultRoot, "projects", "renamedfolder")),
+    ).toBe(false);
+
+    // Should forbid deleting or renaming vault root
     const delRootRes = await request(ctx.app)
       .delete("/api/folder?path=")
       .expect(403);
     expect(delRootRes.body.error.code).toBe("ACCESS_DENIED");
+
+    const patchRootRes = await request(ctx.app)
+      .patch("/api/folder?path=")
+      .send({ newPath: "newroot" })
+      .expect(403);
+    expect(patchRootRes.body.error.code).toBe("ACCESS_DENIED");
   });
 });

@@ -11,6 +11,7 @@ interface FileTreeProps {
   onNewNoteInFolder: (folderPath: string) => void;
   onNewSubFolder: (folderPath: string) => void;
   onDeleteFolder: (folderPath: string) => void;
+  onContextMenu?: (e: React.MouseEvent, node: TreeNode) => void;
 }
 
 export const FileTree: React.FC<FileTreeProps> = ({
@@ -22,6 +23,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
   onNewNoteInFolder,
   onNewSubFolder,
   onDeleteFolder,
+  onContextMenu,
 }) => {
   if (items.length === 0) {
     return (
@@ -45,6 +47,7 @@ export const FileTree: React.FC<FileTreeProps> = ({
           onNewNoteInFolder={onNewNoteInFolder}
           onNewSubFolder={onNewSubFolder}
           onDeleteFolder={onDeleteFolder}
+          onContextMenu={onContextMenu}
         />
       ))}
     </nav>

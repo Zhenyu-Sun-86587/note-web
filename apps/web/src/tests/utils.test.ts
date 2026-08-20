@@ -8,6 +8,7 @@ import {
 } from "../utils/note-path";
 import { generateConflictPath } from "../utils/filename";
 import { formatDate } from "../utils/date";
+import { generateCopyFilename } from "../utils/copy-name";
 
 describe("Web Utils", () => {
   describe("note-path utils", () => {
@@ -54,6 +55,28 @@ describe("Web Utils", () => {
       const formatted = formatDate("2026-08-20T12:00:00.000Z");
       expect(typeof formatted).toBe("string");
       expect(formatted.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("copy-name utils", () => {
+    it("generateCopyFilename returns original if no collision exists", () => {
+      expect(generateCopyFilename("Paper.md", ["Other.md"])).toBe("Paper.md");
+    });
+
+    it("generateCopyFilename generates copy name with collision", () => {
+      expect(generateCopyFilename("Paper.md", ["Paper.md"])).toBe(
+        "Paper copy.md",
+      );
+      expect(
+        generateCopyFilename("Paper.md", ["Paper.md", "Paper copy.md"]),
+      ).toBe("Paper copy 2.md");
+      expect(
+        generateCopyFilename("Paper.md", [
+          "Paper.md",
+          "Paper copy.md",
+          "Paper copy 2.md",
+        ]),
+      ).toBe("Paper copy 3.md");
     });
   });
 });

@@ -24,6 +24,7 @@ interface SidebarProps {
   onNewNoteInFolder: (folderPath: string) => void;
   onNewSubFolder: (folderPath: string) => void;
   onDeleteFolder: (folderPath: string) => void;
+  onContextMenu?: (e: React.MouseEvent, node?: TreeNode) => void;
   loading: boolean;
 }
 
@@ -41,10 +42,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewNoteInFolder,
   onNewSubFolder,
   onDeleteFolder,
+  onContextMenu,
   loading,
 }) => {
   return (
-    <div className="sidebar">
+    <div
+      className="sidebar"
+      onContextMenu={(e) => {
+        // If right clicked on empty area of sidebar
+        const target = e.target as HTMLElement;
+        if (target.closest(".tree-item") || target.closest(".tree-action-btn")) {
+          return;
+        }
+        e.preventDefault();
+        onContextMenu?.(e);
+      }}
+    >
       <div className="sidebar-header">
         <div className="sidebar-title">
           <span>Note Web</span>
@@ -64,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
           <IconButton
             icon={<Search size={16} />}
-            label="全文搜索 (Ctrl+K)"
+            label="全文搜索 (Ctrl+Shift+F)"
             onClick={onOpenSearch}
             size="sm"
           />
@@ -94,6 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onNewNoteInFolder={onNewNoteInFolder}
           onNewSubFolder={onNewSubFolder}
           onDeleteFolder={onDeleteFolder}
+          onContextMenu={onContextMenu}
         />
       </div>
     </div>

@@ -22,6 +22,7 @@ interface FileTreeItemProps {
   onNewNoteInFolder: (folderPath: string) => void;
   onNewSubFolder: (folderPath: string) => void;
   onDeleteFolder: (folderPath: string) => void;
+  onContextMenu?: (e: React.MouseEvent, node: TreeNode) => void;
 }
 
 export const FileTreeItem: React.FC<FileTreeItemProps> = ({
@@ -34,6 +35,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
   onNewNoteInFolder,
   onNewSubFolder,
   onDeleteFolder,
+  onContextMenu,
 }) => {
   const [hovered, setHovered] = useState(false);
 
@@ -48,6 +50,11 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
           className={`tree-item tree-folder ${hovered ? "hovered" : ""}`}
           style={indentStyle}
           onClick={() => onToggleFolder(node.path)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onContextMenu?.(e, node);
+          }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
@@ -105,6 +112,7 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
                 onNewNoteInFolder={onNewNoteInFolder}
                 onNewSubFolder={onNewSubFolder}
                 onDeleteFolder={onDeleteFolder}
+                onContextMenu={onContextMenu}
               />
             ))}
           </div>
@@ -120,6 +128,11 @@ export const FileTreeItem: React.FC<FileTreeItemProps> = ({
       className={`tree-item tree-note ${isSelected ? "selected" : ""}`}
       style={indentStyle}
       onClick={() => onSelectNote(node.path)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onContextMenu?.(e, node);
+      }}
       title={node.path}
     >
       <span className="tree-caret tree-caret-placeholder" />

@@ -12,6 +12,11 @@ import { RenameDialog } from "./components/dialogs/RenameDialog";
 import { MoveDialog } from "./components/dialogs/MoveDialog";
 import { ConfirmDeleteDialog } from "./components/dialogs/ConfirmDeleteDialog";
 import { SettingsDialog } from "./components/settings/SettingsDialog";
+import {
+  FileContextMenu,
+  type ContextTarget,
+  type FileClipboard,
+} from "./components/sidebar/FileContextMenu";
 
 import type { TreeNode, NoteDocument } from "./api/types";
 import {
@@ -19,6 +24,7 @@ import {
   fetchNote,
   createNote,
   renameOrMoveNote,
+  renameFolder,
   deleteNote,
   createFolder,
   deleteFolder,
@@ -28,7 +34,33 @@ import { useAutosave } from "./hooks/useAutosave";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useWindowFocusRefresh } from "./hooks/useWindowFocusRefresh";
 import { generateConflictPath } from "./utils/filename";
-import { getDirname } from "./utils/note-path";
+import { getDirname, getBasename } from "./utils/note-path";
+import { generateCopyFilename } from "./utils/copy-name";
+
+function getFilenamesInFolder(tree: TreeNode[], folderPath: string): string[] {
+  if (!folderPath) {
+    return tree
+      .filter((item): item is Extract<TreeNode, { type: "note" }> => item.type === "note")
+      .map((item) => item.name);
+  }
+  function findFolder(
+    items: TreeNode[],
+  ): Extract<TreeNode, { type: "folder" }> | null {
+    for (const item of items) {
+      if (item.type === "folder") {
+        if (item.path === folderPath) return item;
+        const found = findFolder(item.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  const folder = findFolder(tree);
+  if (!folder) return [];
+  return folder.children
+    .filter((item): item is Extract<TreeNode, { type: "note" }> => item.type === "note")
+    .map((item) => item.name);
+}
 
 export default function App() {
   const { settings, effectiveTheme, updateSetting, resetSettings } =
@@ -60,12 +92,22 @@ export default function App() {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderDefaultParent, setNewFolderDefaultParent] = useState("");
   const [renameOpen, setRenameOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<{
+    type: "note" | "folder";
+    path: string;
+  } | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
     type: "note" | "folder";
     path: string;
   } | null>(null);
+
+  // Context menu & internal clipboard state
+  const [contextMenuTarget, setContextMenuTarget] =
+    useState<ContextTarget | null>(null);
+  const [clipboard, setClipboard] = useState<FileClipboard | null>(null);
 
   const isDirty = openNote !== null && draftContent !== openNote.content;
 
@@ -263,24 +305,67 @@ export default function App() {
     setExpandedFolders((prev) => new Set([...prev, folderPath]));
   };
 
-  const handleRenameNote = async (newPath: string) => {
-    if (!openNote) return;
-    if (!(await flushCurrentNote())) {
-      return;
+  const handleRenameSubmit = async (newPath: string) => {
+    if (!renameTarget) return;
+
+    if (renameTarget.type === "note") {
+      if (openNote?.path === renameTarget.path) {
+        if (!(await flushCurrentNote())) {
+          return;
+        }
+      }
+      await renameOrMoveNote(renameTarget.path, newPath);
+      if (openNote?.path === renameTarget.path) {
+        setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
+      }
+    } else {
+      await renameFolder(renameTarget.path, newPath);
+      // Remap openNote path if it is inside renamed folder
+      if (
+        openNote &&
+        (openNote.path === renameTarget.path ||
+          openNote.path.startsWith(`${renameTarget.path}/`))
+      ) {
+        const suffix = openNote.path.slice(renameTarget.path.length);
+        setOpenNote((prev) =>
+          prev ? { ...prev, path: `${newPath}${suffix}` } : null,
+        );
+      }
+      // Remap expandedFolders
+      setExpandedFolders((prev) => {
+        const next = new Set<string>();
+        prev.forEach((folder) => {
+          if (folder === renameTarget.path) {
+            next.add(newPath);
+          } else if (folder.startsWith(`${renameTarget.path}/`)) {
+            next.add(`${newPath}${folder.slice(renameTarget.path.length)}`);
+          } else {
+            next.add(folder);
+          }
+        });
+        return next;
+      });
     }
-    await renameOrMoveNote(openNote.path, newPath);
+
     await loadTree();
-    setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
+    setRenameOpen(false);
+    setRenameTarget(null);
   };
 
-  const handleMoveNote = async (newPath: string) => {
-    if (!openNote) return;
-    if (!(await flushCurrentNote())) {
-      return;
+  const handleMoveSubmit = async (newPath: string) => {
+    if (!moveTarget) return;
+    if (openNote?.path === moveTarget) {
+      if (!(await flushCurrentNote())) {
+        return;
+      }
     }
-    await renameOrMoveNote(openNote.path, newPath);
+    await renameOrMoveNote(moveTarget, newPath);
+    if (openNote?.path === moveTarget) {
+      setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
+    }
     await loadTree();
-    setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
+    setMoveOpen(false);
+    setMoveTarget(null);
   };
 
   const handleDeleteCurrentNote = () => {
@@ -314,6 +399,79 @@ export default function App() {
     }
 
     await loadTree();
+  };
+
+  // Context Menu Actions
+  const handleOpenContextMenu = (
+    e: React.MouseEvent,
+    node?: TreeNode,
+  ) => {
+    if (!node) {
+      setContextMenuTarget({
+        type: "root",
+        path: "",
+        x: e.clientX,
+        y: e.clientY,
+      });
+      return;
+    }
+
+    if (node.type === "note") {
+      setContextMenuTarget({
+        type: "note",
+        path: node.path,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    } else {
+      setContextMenuTarget({
+        type: "folder",
+        path: node.path,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    }
+  };
+
+  const handleCopyNote = (notePath: string) => {
+    setClipboard({
+      operation: "copy",
+      type: "note",
+      sourcePath: notePath,
+    });
+  };
+
+  const handlePasteNote = async (targetFolder: string) => {
+    if (!clipboard || clipboard.type !== "note") return;
+
+    try {
+      if (openNote?.path === clipboard.sourcePath) {
+        if (!(await flushCurrentNote())) {
+          return;
+        }
+      }
+
+      const sourceDoc = await fetchNote(clipboard.sourcePath);
+      const baseFilename = getBasename(clipboard.sourcePath);
+      const existingInTarget = getFilenamesInFolder(tree, targetFolder);
+      const targetFilename = generateCopyFilename(
+        baseFilename,
+        existingInTarget,
+      );
+      const targetPath = targetFolder
+        ? `${targetFolder}/${targetFilename}`
+        : targetFilename;
+
+      await createNote(targetPath, sourceDoc.content);
+      await loadTree();
+
+      if (targetFolder) {
+        setExpandedFolders((prev) => new Set([...prev, targetFolder]));
+      }
+    } catch (err: unknown) {
+      // eslint-disable-next-line no-alert
+      alert(`粘贴笔记失败: ${err instanceof Error ? err.message : "未知错误"}`);
+    }
   };
 
   // Keyboard shortcuts
@@ -368,6 +526,7 @@ export default function App() {
             setNewFolderOpen(true);
           }}
           onDeleteFolder={handleDeleteFolderAction}
+          onContextMenu={handleOpenContextMenu}
           loading={treeLoading}
         />
       }
@@ -379,8 +538,18 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onSave={saveNow}
         canSave={Boolean(openNote) && saveStatus !== "conflict"}
-        onRename={() => setRenameOpen(true)}
-        onMove={() => setMoveOpen(true)}
+        onRename={() => {
+          if (openNote) {
+            setRenameTarget({ type: "note", path: openNote.path });
+            setRenameOpen(true);
+          }
+        }}
+        onMove={() => {
+          if (openNote) {
+            setMoveTarget(openNote.path);
+            setMoveOpen(true);
+          }
+        }}
         onDelete={handleDeleteCurrentNote}
       />
 
@@ -402,6 +571,37 @@ export default function App() {
         saveStatus={effectiveSaveStatus}
         content={draftContent}
         isNoteOpen={Boolean(openNote)}
+      />
+
+      {/* File Context Menu */}
+      <FileContextMenu
+        target={contextMenuTarget}
+        clipboard={clipboard}
+        onClose={() => setContextMenuTarget(null)}
+        onOpenNote={switchNote}
+        onNewNote={(folder) => {
+          setNewNoteDefaultFolder(folder);
+          setNewNoteOpen(true);
+        }}
+        onNewFolder={(parent) => {
+          setNewFolderDefaultParent(parent);
+          setNewFolderOpen(true);
+        }}
+        onRename={(target) => {
+          setRenameTarget(target);
+          setRenameOpen(true);
+        }}
+        onMove={(path) => {
+          setMoveTarget(path);
+          setMoveOpen(true);
+        }}
+        onCopy={handleCopyNote}
+        onPaste={handlePasteNote}
+        onDelete={(target) => {
+          setDeleteTarget(target);
+          setDeleteDialogOpen(true);
+        }}
+        onRefresh={loadTree}
       />
 
       {/* Dialogs */}
@@ -442,23 +642,29 @@ export default function App() {
         onSubmit={handleCreateFolder}
       />
 
-      {openNote && (
-        <>
-          <RenameDialog
-            isOpen={renameOpen}
-            onClose={() => setRenameOpen(false)}
-            currentPath={openNote.path}
-            onSubmit={handleRenameNote}
-          />
+      {renameTarget && (
+        <RenameDialog
+          isOpen={renameOpen}
+          onClose={() => {
+            setRenameOpen(false);
+            setRenameTarget(null);
+          }}
+          currentPath={renameTarget.path}
+          onSubmit={handleRenameSubmit}
+        />
+      )}
 
-          <MoveDialog
-            isOpen={moveOpen}
-            onClose={() => setMoveOpen(false)}
-            currentPath={openNote.path}
-            tree={tree}
-            onSubmit={handleMoveNote}
-          />
-        </>
+      {moveTarget && (
+        <MoveDialog
+          isOpen={moveOpen}
+          onClose={() => {
+            setMoveOpen(false);
+            setMoveTarget(null);
+          }}
+          currentPath={moveTarget}
+          tree={tree}
+          onSubmit={handleMoveSubmit}
+        />
       )}
 
       {deleteTarget && (

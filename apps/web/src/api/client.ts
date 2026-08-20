@@ -105,6 +105,18 @@ export async function createFolder(
   return handleResponse<{ ok: boolean; path: string }>(res);
 }
 
+export async function renameFolder(
+  path: string,
+  newPath: string,
+): Promise<{ ok: boolean; oldPath: string; newPath: string }> {
+  const res = await fetch(`/api/folder?path=${encodeURIComponent(path)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newPath }),
+  });
+  return handleResponse<{ ok: boolean; oldPath: string; newPath: string }>(res);
+}
+
 export async function deleteFolder(path: string): Promise<void> {
   const res = await fetch(`/api/folder?path=${encodeURIComponent(path)}`, {
     method: "DELETE",

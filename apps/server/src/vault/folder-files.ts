@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import {
   resolveExistingFolderPath,
   resolveNewFolderPath,
@@ -13,11 +14,44 @@ export async function createFolder(
   await fs.promises.mkdir(fullPath);
 }
 
+export async function renameFolder(
+  vaultRoot: string,
+  fromRelativePath: string,
+  toRelativePath: string,
+): Promise<void> {
+  const normalizedFrom = fromRelativePath
+    ? fromRelativePath.replaceAll("\\", "/").trim()
+    : "";
+  if (!normalizedFrom || normalizedFrom === "." || normalizedFrom === "/") {
+    throw new VaultError(
+      "ACCESS_DENIED",
+      "Cannot rename vault root folder",
+      403,
+    );
+  }
+
+  const { fullPath: srcFull } = await resolveExistingFolderPath(
+    vaultRoot,
+    fromRelativePath,
+  );
+  const { fullPath: destFull } = await resolveNewFolderPath(
+    vaultRoot,
+    toRelativePath,
+  );
+
+  const parentDir = path.dirname(destFull);
+  await fs.promises.mkdir(parentDir, { recursive: true });
+
+  await fs.promises.rename(srcFull, destFull);
+}
+
 export async function deleteFolder(
   vaultRoot: string,
   relativePath: string,
 ): Promise<void> {
-  const normalized = relativePath ? relativePath.replaceAll("\\", "/").trim() : "";
+  const normalized = relativePath
+    ? relativePath.replaceAll("\\", "/").trim()
+    : "";
   if (!normalized || normalized === "." || normalized === "/") {
     throw new VaultError(
       "ACCESS_DENIED",
