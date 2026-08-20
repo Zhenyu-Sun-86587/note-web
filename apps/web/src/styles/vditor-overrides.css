@@ -3,14 +3,20 @@
 .editor-container {
   height: 100%;
   width: 100%;
+  min-height: 0;
 }
 
-.vditor {
+.editor-container > .vditor {
+  height: 100% !important;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column !important;
   border: none !important;
   background-color: var(--editor-bg) !important;
 }
 
 .vditor-toolbar {
+  flex-shrink: 0 !important;
   background-color: var(--panel-bg) !important;
   border-bottom: 1px solid var(--border-color) !important;
   padding: 4px 16px !important;
@@ -26,10 +32,19 @@
 }
 
 .vditor-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
   background-color: var(--editor-bg) !important;
 }
 
 .vditor-ir {
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
   background-color: var(--editor-bg) !important;
 }
 
@@ -41,7 +56,11 @@
   background-color: var(--editor-bg) !important;
   max-width: var(--editor-max-width) !important;
   margin: 0 auto !important;
-  padding: 32px 48px !important;
+  padding: 32px var(--editor-padding-x, 48px) !important;
+  box-sizing: border-box !important;
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-y: visible !important;
 }
 
 .vditor-reset pre,

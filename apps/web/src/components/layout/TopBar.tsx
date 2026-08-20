@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import {
   PanelLeft,
-  Sun,
-  Moon,
+  Settings as SettingsIcon,
   Save,
   MoreVertical,
   Edit2,
@@ -11,14 +10,12 @@ import {
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
 import { Button } from "../common/Button";
-import type { Theme } from "../../hooks/useTheme";
 
 interface TopBarProps {
   currentPath: string | null;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  theme: Theme;
-  onToggleTheme: () => void;
+  onOpenSettings: () => void;
   onSave: () => void;
   canSave: boolean;
   onRename: () => void;
@@ -30,8 +27,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   currentPath,
   sidebarOpen,
   onToggleSidebar,
-  theme,
-  onToggleTheme,
+  onOpenSettings,
   onSave,
   canSave,
   onRename,
@@ -125,9 +121,9 @@ export const TopBar: React.FC<TopBarProps> = ({
         )}
 
         <IconButton
-          icon={theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-          label={theme === "light" ? "切换至深色模式" : "切换至浅色模式"}
-          onClick={onToggleTheme}
+          icon={<SettingsIcon size={18} />}
+          label="设置"
+          onClick={onOpenSettings}
           size="sm"
         />
       </div>

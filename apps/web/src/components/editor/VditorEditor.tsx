@@ -3,7 +3,8 @@ import Vditor from "vditor";
 import "vditor/dist/index.css";
 import { uploadAsset } from "../../api/client";
 import { resolveMarkdownPreviewUrl } from "../../utils/preview-url";
-import type { Theme } from "../../hooks/useTheme";
+
+export type Theme = "light" | "dark";
 
 interface VditorEditorProps {
   notePath: string;
@@ -31,6 +32,7 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
 
     vditorInstance = new Vditor(hostId, {
       mode: "ir",
+      height: "100%",
       value,
       theme: theme === "dark" ? "dark" : "classic",
       preview: {

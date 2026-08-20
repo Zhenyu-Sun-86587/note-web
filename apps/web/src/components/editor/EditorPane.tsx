@@ -2,7 +2,7 @@ import React from "react";
 import { VditorEditor } from "./VditorEditor";
 import { EmptyEditor } from "./EmptyEditor";
 import { ConflictBanner } from "./ConflictBanner";
-import type { Theme } from "../../hooks/useTheme";
+import type { Theme } from "./VditorEditor";
 
 interface EditorPaneProps {
   notePath: string | null;

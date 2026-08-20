@@ -11,6 +11,7 @@ import { NewFolderDialog } from "./components/dialogs/NewFolderDialog";
 import { RenameDialog } from "./components/dialogs/RenameDialog";
 import { MoveDialog } from "./components/dialogs/MoveDialog";
 import { ConfirmDeleteDialog } from "./components/dialogs/ConfirmDeleteDialog";
+import { SettingsDialog } from "./components/settings/SettingsDialog";
 
 import type { TreeNode, NoteDocument } from "./api/types";
 import {
@@ -22,7 +23,7 @@ import {
   createFolder,
   deleteFolder,
 } from "./api/client";
-import { useTheme } from "./hooks/useTheme";
+import { useSettings } from "./hooks/useSettings";
 import { useAutosave } from "./hooks/useAutosave";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useWindowFocusRefresh } from "./hooks/useWindowFocusRefresh";
@@ -30,7 +31,8 @@ import { generateConflictPath } from "./utils/filename";
 import { getDirname } from "./utils/note-path";
 
 export default function App() {
-  const { theme, toggleTheme } = useTheme();
+  const { settings, effectiveTheme, updateSetting, resetSettings } =
+    useSettings();
 
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
@@ -50,6 +52,7 @@ export default function App() {
   const hasAutoOpenedRef = useRef(false);
 
   // Dialogs state
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [newNoteOpen, setNewNoteOpen] = useState(false);
@@ -327,7 +330,8 @@ export default function App() {
     },
   });
 
-  const effectiveSaveStatus = isDirty && saveStatus === "idle" ? "dirty" : saveStatus;
+  const effectiveSaveStatus =
+    isDirty && saveStatus === "idle" ? "dirty" : saveStatus;
 
   return (
     <AppShell
@@ -369,8 +373,7 @@ export default function App() {
         currentPath={openNote?.path ?? null}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-        theme={theme}
-        onToggleTheme={toggleTheme}
+        onOpenSettings={() => setSettingsOpen(true)}
         onSave={saveNow}
         canSave={Boolean(openNote) && saveStatus !== "conflict"}
         onRename={() => setRenameOpen(true)}
@@ -382,7 +385,7 @@ export default function App() {
         notePath={openNote?.path ?? null}
         initialContent={draftContent}
         hasConflict={saveStatus === "conflict"}
-        theme={theme}
+        theme={effectiveTheme}
         onChange={(val) => setDraftContent(val)}
         onNewNote={() => {
           setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
@@ -399,6 +402,14 @@ export default function App() {
       />
 
       {/* Dialogs */}
+      <SettingsDialog
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onUpdateSetting={updateSetting}
+        onResetSettings={resetSettings}
+      />
+
       <QuickOpenDialog
         isOpen={quickOpenOpen}
         onClose={() => setQuickOpenOpen(false)}
