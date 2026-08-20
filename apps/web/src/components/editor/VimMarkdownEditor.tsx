@@ -5,8 +5,9 @@ import {
   forwardRef,
 } from "react";
 import { EditorView, basicSetup } from "codemirror";
+import { Transaction } from "@codemirror/state";
 import { markdown } from "@codemirror/lang-markdown";
-import { vim, Vim, getCM } from "@replit/codemirror-vim";
+import { vim, Vim } from "@replit/codemirror-vim";
 import type { EditorHandle } from "./EditorHandle";
 import "../../styles/vim-editor.css";
 
@@ -109,21 +110,23 @@ export const VimMarkdownEditor = forwardRef<
     // 1. Intercept Ctrl shortcuts to prevent browser hijacking (e.g. Ctrl+R reload, Ctrl+P print, Ctrl+F find, etc.)
     const vimKeyInterceptor = EditorView.domEventHandlers({
       keydown: (e, _view) => {
-        const isMac =
-          typeof navigator !== "undefined" &&
-          navigator.platform.toUpperCase().includes("MAC");
-        const mod = isMac ? e.metaKey : e.ctrlKey;
-
-        // Save: Ctrl/Cmd + S
-        if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s") {
+        // App Save: Cmd+S on Mac, Ctrl+S elsewhere
+        const isSave =
+          (e.metaKey || e.ctrlKey) &&
+          !e.shiftKey &&
+          !e.altKey &&
+          e.key.toLowerCase() === "s";
+        if (isSave) {
           e.preventDefault();
           e.stopPropagation();
           onSaveRef.current?.();
           return true;
         }
 
-        // Take over conflicting browser shortcuts so Vim handles them without browser interference
-        if (mod && !e.altKey) {
+        // Vim Control chords: ALWAYS e.ctrlKey (never metaKey / Mac Command)
+        // Prevent conflicting browser shortcuts from hijacking Vim control chords.
+        // Mac Command shortcuts (Cmd+R, Cmd+F, Cmd+W, Cmd+P, Cmd+Q) continue to be handled by the browser.
+        if (e.ctrlKey && !e.metaKey && !e.altKey) {
           const key = e.key.toLowerCase();
           const vimHijackCtrlKeys = new Set([
             "r",
@@ -161,19 +164,6 @@ export const VimMarkdownEditor = forwardRef<
       },
     });
 
-    // 2. Guard normal mode against arbitrary direct text insertions without entering insert mode
-    const normalModeInputGuard = EditorView.inputHandler.of(
-      (view, _from, _to, text) => {
-        const cm = getCM(view);
-        const vimState = cm?.state?.vim;
-        if (vimState && !vimState.insertMode && !cm?.curOp?.isVimOp) {
-          if (text === "\0\0") return true;
-          return true; // Block unhandled text insertions in normal/visual mode
-        }
-        return false;
-      },
-    );
-
     const themeExtension = EditorView.theme({
       "&": {
         height: "100%",
@@ -200,7 +190,6 @@ export const VimMarkdownEditor = forwardRef<
       doc: value,
       extensions: [
         vimKeyInterceptor,
-        normalModeInputGuard,
         vim({ status: true }),
         basicSetup,
         markdown(),
@@ -219,16 +208,20 @@ export const VimMarkdownEditor = forwardRef<
     };
   }, []); // Mounted once per note/mode switch
 
-  // Sync external changes (conflict reload / external reload)
+  // Sync external changes (conflict reload / external reload) without polluting undo history
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
     const currentDoc = view.state.doc.toString();
-    if (value !== currentDoc && value !== lastEmittedValueRef.current) {
+    if (value !== currentDoc) {
+      if (lastEmittedValueRef.current === value) {
+        return;
+      }
       lastEmittedValueRef.current = value;
       view.dispatch({
         changes: { from: 0, to: currentDoc.length, insert: value },
+        annotations: Transaction.addToHistory.of(false),
       });
     }
   }, [value]);

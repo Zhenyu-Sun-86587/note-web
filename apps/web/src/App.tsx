@@ -29,7 +29,11 @@ import {
   createFolder,
   deleteFolder,
 } from "./api/client";
-import { useSettings, type EditorMode } from "./hooks/useSettings";
+import {
+  useSettings,
+  LAST_OPEN_NOTE_KEY,
+  type EditorMode,
+} from "./hooks/useSettings";
 import { useAutosave } from "./hooks/useAutosave";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useWindowFocusRefresh } from "./hooks/useWindowFocusRefresh";
@@ -61,6 +65,36 @@ function getFilenamesInFolder(tree: TreeNode[], folderPath: string): string[] {
   return folder.children
     .filter((item): item is Extract<TreeNode, { type: "note" }> => item.type === "note")
     .map((item) => item.name);
+}
+
+function findPathInTree(items: TreeNode[], targetPath: string): boolean {
+  for (const item of items) {
+    if (item.path === targetPath) return true;
+    if (item.type === "folder" && item.children) {
+      if (findPathInTree(item.children, targetPath)) return true;
+    }
+  }
+  return false;
+}
+
+function findFirstNote(items: TreeNode[]): string | null {
+  for (const item of items) {
+    if (item.type === "note") return item.path;
+    if (item.type === "folder" && item.children) {
+      const nested = findFirstNote(item.children);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function getAncestorFolders(notePath: string): string[] {
+  const parts = notePath.split("/");
+  const ancestors: string[] = [];
+  for (let i = 1; i < parts.length; i++) {
+    ancestors.push(parts.slice(0, i).join("/"));
+  }
+  return ancestors;
 }
 
 export default function App() {
@@ -119,12 +153,6 @@ export default function App() {
   );
   const editorPaneRef = useRef<EditorHandle | null>(null);
 
-  useEffect(() => {
-    if (settings.editorMode && settings.editorMode !== editorMode) {
-      setEditorMode(settings.editorMode);
-    }
-  }, [settings.editorMode]);
-
   const handleSwitchEditorMode = useCallback(
     (mode: EditorMode) => {
       if (editorMode === mode) return;
@@ -139,6 +167,24 @@ export default function App() {
     },
     [editorMode, draftContent],
   );
+
+  const prevSettingsEditorModeRef = useRef(settings.editorMode);
+  useEffect(() => {
+    if (settings.editorMode !== prevSettingsEditorModeRef.current) {
+      prevSettingsEditorModeRef.current = settings.editorMode;
+      handleSwitchEditorMode(settings.editorMode);
+    }
+  }, [settings.editorMode, handleSwitchEditorMode]);
+
+  useEffect(() => {
+    if (openNote?.path) {
+      try {
+        localStorage.setItem(LAST_OPEN_NOTE_KEY, openNote.path);
+      } catch {
+        // ignore storage write error
+      }
+    }
+  }, [openNote?.path]);
 
   const [zenMode, setZenMode] = useState(false);
   const [showZenHint, setShowZenHint] = useState(false);
@@ -195,26 +241,72 @@ export default function App() {
     [],
   );
 
-  // Auto-open first note only on first load
+  // Auto-open note on initial tree load based on startupNoteMode
   useEffect(() => {
     if (tree.length > 0 && !openNote && !hasAutoOpenedRef.current) {
-      function findFirstNote(items: TreeNode[]): string | null {
-        for (const item of items) {
-          if (item.type === "note") return item.path;
-          if (item.type === "folder") {
-            const nested = findFirstNote(item.children);
-            if (nested) return nested;
+      hasAutoOpenedRef.current = true;
+      const mode = settings.startupNoteMode || "last";
+      if (mode === "none") {
+        return;
+      }
+
+      if (mode === "first") {
+        const first = findFirstNote(tree);
+        if (first) {
+          handleOpenNote(first);
+          const ancestors = getAncestorFolders(first);
+          if (ancestors.length > 0) {
+            setExpandedFolders((prev) => {
+              const next = new Set(prev);
+              ancestors.forEach((a) => next.add(a));
+              return next;
+            });
           }
         }
-        return null;
+        return;
       }
-      const firstNote = findFirstNote(tree);
-      if (firstNote) {
-        hasAutoOpenedRef.current = true;
-        handleOpenNote(firstNote);
+
+      // Default: "last"
+      let lastPath: string | null = null;
+      try {
+        lastPath = localStorage.getItem(LAST_OPEN_NOTE_KEY);
+      } catch {
+        lastPath = null;
+      }
+
+      if (lastPath && findPathInTree(tree, lastPath)) {
+        handleOpenNote(lastPath);
+        const ancestors = getAncestorFolders(lastPath);
+        if (ancestors.length > 0) {
+          setExpandedFolders((prev) => {
+            const next = new Set(prev);
+            ancestors.forEach((a) => next.add(a));
+            return next;
+          });
+        }
+      } else {
+        if (lastPath) {
+          try {
+            localStorage.removeItem(LAST_OPEN_NOTE_KEY);
+          } catch {
+            // ignore
+          }
+        }
+        const fallbackFirst = findFirstNote(tree);
+        if (fallbackFirst) {
+          handleOpenNote(fallbackFirst);
+          const ancestors = getAncestorFolders(fallbackFirst);
+          if (ancestors.length > 0) {
+            setExpandedFolders((prev) => {
+              const next = new Set(prev);
+              ancestors.forEach((a) => next.add(a));
+              return next;
+            });
+          }
+        }
       }
     }
-  }, [tree, openNote, handleOpenNote]);
+  }, [tree, openNote, handleOpenNote, settings.startupNoteMode]);
 
   // Autosave hook
   const {

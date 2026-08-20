@@ -23,7 +23,7 @@ test.beforeAll(() => {
   }
 });
 
-test.afterEach(() => {
+function resetTestVault() {
   // 1. If renamed_projects exists, restore to projects
   const renamedFolder = path.resolve(
     process.cwd(),
@@ -61,6 +61,14 @@ test.afterEach(() => {
   if (fs.existsSync(copyFile2)) {
     fs.unlinkSync(copyFile2);
   }
+}
+
+test.beforeEach(() => {
+  resetTestVault();
+});
+
+test.afterEach(() => {
+  resetTestVault();
 });
 
 test.describe("Note Web E2E Suite", () => {
@@ -703,9 +711,12 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("u");
     await expect(cmContent).toContainText("firstword secondword thirdword");
 
-    // Ctrl+r to redo
-    await page.keyboard.press("Control+r");
+    // :redo to redo
+    await page.keyboard.press(":");
+    await page.keyboard.type("redo");
+    await page.keyboard.press("Enter");
     await expect(cmContent).not.toContainText("firstword");
+    await expect(cmContent).toContainText("secondword thirdword");
 
     // Search /secondword
     await page.keyboard.press("/");
@@ -840,11 +851,180 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("Escape");
     await expect(vimPanel).toContainText("NORMAL");
 
-    // Test Undo (u) and Redo (Control+r) - Redo does NOT reload the browser
+    // Test Undo (u) and Redo (:redo)
     await page.keyboard.press("u");
     await expect(cmContent).not.toContainText("ExplicitInsertMode");
 
-    await page.keyboard.press("Control+r");
+    await page.keyboard.press(":");
+    await page.keyboard.type("redo");
+    await page.keyboard.press("Enter");
     await expect(cmContent).toContainText("ExplicitInsertMode");
+  });
+
+  test("Session Resume: restores last open note and expands ancestor folders on startup", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator(".vditor-ir .vditor-reset")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // 1. Open projects/example.md
+    const exampleNote = page
+      .locator(".tree-note")
+      .filter({ hasText: "example" })
+      .first();
+    const isExampleVisible = await exampleNote.isVisible();
+    if (!isExampleVisible) {
+      const projectsFolder = page
+        .locator(".tree-folder")
+        .filter({ hasText: "projects" })
+        .first();
+      await projectsFolder.click();
+    }
+    await expect(exampleNote).toBeVisible({ timeout: 5000 });
+    await exampleNote.click();
+    await expect(page.locator(".topbar-path")).toContainText(
+      "projects/example.md",
+    );
+
+    // Verify localStorage has saved the last open note path
+    const savedPath = await page.evaluate(() =>
+      localStorage.getItem("note-web-last-open-note-v1"),
+    );
+    expect(savedPath).toBe("projects/example.md");
+
+    // 2. Reload page with clean state -> should automatically open projects/example.md
+    await page.reload();
+    await expect(page.locator(".topbar-path")).toContainText(
+      "projects/example.md",
+      { timeout: 10000 },
+    );
+    await expect(
+      page.locator(".tree-note").filter({ hasText: "example" }).first(),
+    ).toBeVisible();
+  });
+
+  test("Session Resume: falls back to first note without alert when saved last note is missing", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator(".vditor-ir .vditor-reset")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Set non-existent path in localStorage
+    await page.evaluate(() => {
+      localStorage.setItem(
+        "note-web-last-open-note-v1",
+        "deleted_folder/missing_note.md",
+      );
+    });
+
+    let dialogPopped = false;
+    page.on("dialog", (dialog) => {
+      dialogPopped = true;
+      dialog.dismiss();
+    });
+
+    // Reload -> should check tree first, silently discard missing note, and open first available note
+    await page.reload();
+    await expect(page.locator(".topbar-path")).toContainText(
+      "inbox/welcome.md",
+      { timeout: 10000 },
+    );
+
+    expect(dialogPopped).toBe(false);
+  });
+
+  test("Startup Note Policy: respects startupNoteMode ('none' and 'first')", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator(".vditor-ir .vditor-reset")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // 1. Set startupNoteMode to 'none'
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("note-web-settings-v1") || "{}";
+      const settings = JSON.parse(raw);
+      settings.startupNoteMode = "none";
+      localStorage.setItem("note-web-settings-v1", JSON.stringify(settings));
+    });
+
+    await page.reload();
+    // When startupNoteMode is none, no note is auto-opened
+    await expect(page.locator(".empty-editor")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(".topbar-path")).toContainText("未选择笔记");
+
+    // 2. Set startupNoteMode to 'first'
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("note-web-settings-v1") || "{}";
+      const settings = JSON.parse(raw);
+      settings.startupNoteMode = "first";
+      localStorage.setItem("note-web-settings-v1", JSON.stringify(settings));
+      localStorage.setItem(
+        "note-web-last-open-note-v1",
+        "projects/example.md",
+      );
+    });
+
+    await page.reload();
+    // When startupNoteMode is 'first', it always opens first note regardless of last path
+    await expect(page.locator(".topbar-path")).toContainText(
+      "inbox/welcome.md",
+      { timeout: 10000 },
+    );
+  });
+
+  test("Vim external sync does not pollute undo history and 'u' does not restore old content", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    // Switch to VIM mode
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+
+    // Open projects/example.md
+    const exampleNote = page
+      .locator(".tree-note")
+      .filter({ hasText: "example" })
+      .first();
+    const isExampleVisible = await exampleNote.isVisible();
+    if (!isExampleVisible) {
+      const projectsFolder = page
+        .locator(".tree-folder")
+        .filter({ hasText: "projects" })
+        .first();
+      await projectsFolder.click();
+    }
+    await exampleNote.click();
+    await expect(page.locator(".topbar-path")).toContainText(
+      "projects/example.md",
+    );
+
+    // Switch back to inbox/welcome.md to test clean external reload
+    const welcomeNote = page
+      .locator(".tree-note")
+      .filter({ hasText: "welcome" })
+      .first();
+    await welcomeNote.click();
+    await expect(page.locator(".topbar-path")).toContainText(
+      "inbox/welcome.md",
+    );
+
+    // Focus editor in Normal mode and press 'u'
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("u");
+
+    // The content remains intact and does not undo to previous note or previous state
+    await expect(cmContent).toContainText("Welcome to Note Web");
   });
 });

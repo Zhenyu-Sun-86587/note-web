@@ -197,6 +197,23 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 <option value="vim">Vim Markdown</option>
               </select>
             </div>
+            <div className="settings-row">
+              <div className="settings-label">启动时打开</div>
+              <select
+                className="settings-select"
+                value={settings.startupNoteMode || "last"}
+                onChange={(e) =>
+                  onUpdateSetting(
+                    "startupNoteMode",
+                    e.target.value as "last" | "first" | "none",
+                  )
+                }
+              >
+                <option value="last">上次打开的笔记（默认）</option>
+                <option value="first">第一篇笔记</option>
+                <option value="none">不自动打开</option>
+              </select>
+            </div>
           </div>
 
           {/* Editor Section */}

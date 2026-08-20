@@ -33,7 +33,41 @@ export function useKeyboardShortcuts(options: ShortcutsOptions) {
 
       // If focus is inside Vim editor (and not inside an open modal dialog),
       // allow Vim to handle all other keys natively (Ctrl+P, Ctrl+N, Ctrl+B, Ctrl+F, Escape, etc.)
+      // and prevent browser shortcuts (e.g. Ctrl+R reload, Ctrl+P print) from taking over Vim chords.
       if (isInsideVim && !isInsideModal) {
+        if (e.ctrlKey && !e.metaKey && !e.altKey) {
+          const key = e.key.toLowerCase();
+          const vimHijackCtrlKeys = new Set([
+            "r",
+            "p",
+            "f",
+            "b",
+            "d",
+            "u",
+            "o",
+            "n",
+            "w",
+            "a",
+            "e",
+            "y",
+            "v",
+            "[",
+            "]",
+            "c",
+            "h",
+            "j",
+            "k",
+            "l",
+            "g",
+            "t",
+            "i",
+            "m",
+            "q",
+          ]);
+          if (vimHijackCtrlKeys.has(key)) {
+            e.preventDefault();
+          }
+        }
         return;
       }
 

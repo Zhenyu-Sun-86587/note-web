@@ -72,11 +72,13 @@ describe("useSettings and settings management", () => {
       result.current.updateSetting("editorFontSize", 18);
       result.current.updateSetting("theme", "light");
       result.current.updateSetting("editorMode", "vim");
+      result.current.updateSetting("startupNoteMode", "first");
     });
 
     expect(result.current.settings.editorFontSize).toBe(18);
     expect(result.current.settings.theme).toBe("light");
     expect(result.current.settings.editorMode).toBe("vim");
+    expect(result.current.settings.startupNoteMode).toBe("first");
     expect(result.current.effectiveTheme).toBe("light");
 
     const savedRaw = localStorage.getItem(SETTINGS_KEY);
@@ -85,11 +87,23 @@ describe("useSettings and settings management", () => {
     expect(saved.editorFontSize).toBe(18);
     expect(saved.theme).toBe("light");
     expect(saved.editorMode).toBe("vim");
+    expect(saved.startupNoteMode).toBe("first");
 
     act(() => {
       result.current.resetSettings();
     });
 
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("loadSettings ignores invalid startupNoteMode and falls back to default", () => {
+    localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({
+        startupNoteMode: "invalid_mode",
+      }),
+    );
+    const loaded = loadSettings();
+    expect(loaded.startupNoteMode).toBe("last");
   });
 });

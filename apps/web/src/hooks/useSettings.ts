@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type EditorMode = "ir" | "vim";
+export type StartupNoteMode = "last" | "first" | "none";
 
 export interface AppSettings {
   theme: ThemePreference;
   editorMode: EditorMode;
+  startupNoteMode: StartupNoteMode;
   editorFont: string;
   editorFontSize: number;
   editorLineHeight: number;
@@ -17,10 +19,12 @@ export interface AppSettings {
 }
 
 export const SETTINGS_KEY = "note-web-settings-v1";
+export const LAST_OPEN_NOTE_KEY = "note-web-last-open-note-v1";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
   editorMode: "ir",
+  startupNoteMode: "last",
   editorFont:
     '"NoteWeb CJK", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
   editorFontSize: 16,
@@ -42,6 +46,15 @@ export function loadSettings(): AppSettings {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
+    if (
+      parsed.startupNoteMode &&
+      !["last", "first", "none"].includes(parsed.startupNoteMode)
+    ) {
+      delete parsed.startupNoteMode;
+    }
+    if (parsed.editorMode && !["ir", "vim"].includes(parsed.editorMode)) {
+      delete parsed.editorMode;
+    }
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
