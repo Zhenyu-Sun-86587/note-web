@@ -1,0 +1,21 @@
+{
+  "name": "note-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/web",
+    "apps/server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,server \"npm run dev -w apps/web\" \"npm run dev -w apps/server\"",
+    "build": "npm run build -w apps/web && npm run build -w apps/server",
+    "start": "npm run start -w apps/server",
+    "test": "npm run test -w apps/server && npm run test -w apps/web",
+    "typecheck": "npm run typecheck -w apps/web && npm run typecheck -w apps/server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,18 @@
+services:
+  note-web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: note-web-dev
+    user: "1000:1000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      VAULT_ROOT: /vault
+      CUSTOM_CSS_PATH: /config/custom.css
+      FONTS_DIR: /config/fonts
+    volumes:
+      - ../test-vault:/vault
+      - ../config:/config:ro
+    ports:
+      - "127.0.0.1:3000:3000"

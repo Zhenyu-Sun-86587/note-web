@@ -1,0 +1,22 @@
+services:
+  note-web:
+    image: note-web:latest
+    container_name: note-web
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      VAULT_ROOT: /vault
+      CUSTOM_CSS_PATH: /config/custom.css
+      FONTS_DIR: /config/fonts
+    volumes:
+      - /srv/notes:/vault
+      - ./config:/config:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

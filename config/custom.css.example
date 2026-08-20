@@ -1,0 +1,5 @@
+/* Example custom styling for Note Web */
+:root {
+  /* --editor-max-width: 1000px; */
+  /* --editor-font-size: 18px; */
+}

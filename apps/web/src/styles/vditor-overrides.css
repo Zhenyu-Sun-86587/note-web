@@ -1,0 +1,96 @@
+/* Vditor custom overrides for Typora-style clean look and dark theme integration */
+
+.editor-container {
+  height: 100%;
+  width: 100%;
+}
+
+.vditor {
+  border: none !important;
+  background-color: var(--editor-bg) !important;
+}
+
+.vditor-toolbar {
+  background-color: var(--panel-bg) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 4px 16px !important;
+}
+
+.vditor-toolbar__item {
+  color: var(--text-muted) !important;
+}
+
+.vditor-toolbar__item:hover {
+  color: var(--text-primary) !important;
+  background-color: var(--hover-bg) !important;
+}
+
+.vditor-content {
+  background-color: var(--editor-bg) !important;
+}
+
+.vditor-ir {
+  background-color: var(--editor-bg) !important;
+}
+
+.vditor-reset {
+  font-family: var(--font-editor) !important;
+  font-size: var(--editor-font-size) !important;
+  line-height: var(--editor-line-height) !important;
+  color: var(--text-primary) !important;
+  background-color: var(--editor-bg) !important;
+  max-width: var(--editor-max-width) !important;
+  margin: 0 auto !important;
+  padding: 32px 48px !important;
+}
+
+.vditor-reset pre,
+.vditor-reset code {
+  font-family: var(--font-mono) !important;
+}
+
+.vditor-reset a {
+  color: var(--accent) !important;
+}
+
+.vditor-reset blockquote {
+  border-left: 4px solid var(--accent) !important;
+  color: var(--text-muted) !important;
+  padding-left: 12px !important;
+}
+
+.vditor-reset table th,
+.vditor-reset table td {
+  border: 1px solid var(--border-color) !important;
+}
+
+.vditor-reset hr {
+  background-color: var(--border-color) !important;
+}
+
+/* Dark mode specific tweaks */
+html[data-theme="dark"] .vditor {
+  --toolbar-background-color: var(--panel-bg);
+  --panel-background-color: var(--editor-bg);
+}
+
+html[data-theme="dark"] .vditor-toolbar {
+  background-color: var(--panel-bg) !important;
+}
+
+html[data-theme="dark"] .vditor-toolbar__divider {
+  background-color: var(--border-color) !important;
+}
+
+html[data-theme="dark"] .vditor-menu {
+  background-color: var(--panel-bg) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+html[data-theme="dark"] .vditor-menu__item {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .vditor-menu__item:hover {
+  background-color: var(--hover-bg) !important;
+}
