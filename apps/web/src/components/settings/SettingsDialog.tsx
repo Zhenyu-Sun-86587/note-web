@@ -27,6 +27,11 @@ const EDITOR_FONT_PRESETS: { label: string; value: string }[] = [
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
   },
   {
+    label: "Maple Mono CN NF",
+    value:
+      '"Maple Mono CN NF", "Maple Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  },
+  {
     label: "等宽字体 (Mono)",
     value:
       'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
@@ -43,9 +48,19 @@ const UI_FONT_PRESETS: { label: string; value: string }[] = [
     label: "现代无衬线 (Sans)",
     value: '"Inter", "Helvetica Neue", Arial, sans-serif',
   },
+  {
+    label: "Maple Mono CN NF",
+    value:
+      '"Maple Mono CN NF", "Maple Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  },
 ];
 
 const MONO_FONT_PRESETS: { label: string; value: string }[] = [
+  {
+    label: "Maple Mono CN NF",
+    value:
+      '"Maple Mono CN NF", "Maple Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  },
   {
     label: "系统等宽 (System Mono)",
     value:
