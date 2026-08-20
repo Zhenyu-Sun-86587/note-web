@@ -50,6 +50,7 @@ describe("useSettings and settings management", () => {
         ...DEFAULT_SETTINGS,
         editorFontSize: 22,
         editorMaxWidth: null,
+        sidebarWidth: 320,
       },
       "dark",
     );
@@ -59,6 +60,7 @@ describe("useSettings and settings management", () => {
     expect(styleEl).not.toBeNull();
     expect(styleEl?.textContent).toContain("--editor-font-size: 22px");
     expect(styleEl?.textContent).toContain("--editor-max-width: none");
+    expect(styleEl?.textContent).toContain("--sidebar-width: 320px");
   });
 
   it("useSettings updates setting, persists to localStorage, and resets to defaults", () => {

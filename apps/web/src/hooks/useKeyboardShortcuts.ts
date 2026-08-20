@@ -6,13 +6,16 @@ interface ShortcutsOptions {
   onSearch?: () => void;
   onToggleSidebar?: () => void;
   onNewNote?: () => void;
+  onOpenSettings?: () => void;
   onEscape?: () => void;
 }
 
 export function useKeyboardShortcuts(options: ShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const isMac =
+        typeof navigator !== "undefined" &&
+        navigator.platform.toUpperCase().includes("MAC");
       const mod = isMac ? e.metaKey : e.ctrlKey;
 
       if (e.key === "Escape") {
@@ -20,24 +23,46 @@ export function useKeyboardShortcuts(options: ShortcutsOptions) {
         return;
       }
 
-      if (mod && !e.shiftKey && !e.altKey) {
-        const key = e.key.toLowerCase();
-        if (key === "s") {
-          e.preventDefault();
-          options.onSave?.();
-        } else if (key === "p") {
-          e.preventDefault();
-          options.onQuickOpen?.();
-        } else if (key === "k") {
-          e.preventDefault();
-          options.onSearch?.();
-        } else if (key === "b") {
-          e.preventDefault();
-          options.onToggleSidebar?.();
-        } else if (key === "n") {
-          e.preventDefault();
-          options.onNewNote?.();
-        }
+      // Save: Ctrl/Cmd + S
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        options.onSave?.();
+        return;
+      }
+
+      // Settings: Ctrl/Cmd + ,
+      if (mod && !e.shiftKey && !e.altKey && e.key === ",") {
+        e.preventDefault();
+        options.onOpenSettings?.();
+        return;
+      }
+
+      // Quick Open: Ctrl/Cmd + P
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        options.onQuickOpen?.();
+        return;
+      }
+
+      // Toggle Sidebar: Ctrl/Cmd + Shift + B
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        options.onToggleSidebar?.();
+        return;
+      }
+
+      // Global Search: Ctrl/Cmd + Shift + F
+      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        options.onSearch?.();
+        return;
+      }
+
+      // New Note: Ctrl/Cmd + N
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        options.onNewNote?.();
+        return;
       }
     };
 

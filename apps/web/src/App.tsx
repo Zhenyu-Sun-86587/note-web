@@ -328,6 +328,7 @@ export default function App() {
       setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
       setNewNoteOpen(true);
     },
+    onOpenSettings: () => setSettingsOpen(true),
   });
 
   const effectiveSaveStatus =
@@ -336,6 +337,8 @@ export default function App() {
   return (
     <AppShell
       sidebarOpen={sidebarOpen}
+      sidebarWidth={settings.sidebarWidth}
+      onResizeSidebar={(newWidth) => updateSetting("sidebarWidth", newWidth)}
       sidebar={
         <Sidebar
           items={tree}

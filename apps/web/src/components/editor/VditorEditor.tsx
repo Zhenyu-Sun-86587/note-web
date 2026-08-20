@@ -25,10 +25,12 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const syncingRef = useRef(false);
+  const lastEmittedValueRef = useRef(value);
 
   // Initialize Vditor instance
   useEffect(() => {
     let vditorInstance: Vditor | null = null;
+    lastEmittedValueRef.current = value;
 
     vditorInstance = new Vditor(hostId, {
       mode: "ir",
@@ -45,6 +47,7 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
       },
       input: (val: string) => {
         if (syncingRef.current) return;
+        lastEmittedValueRef.current = val;
         onChangeRef.current(val);
       },
       toolbar: [
@@ -93,10 +96,10 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
       },
     });
 
-    // Observe image elements in editor to resolve relative preview URLs
     const hostEl = document.getElementById(hostId);
     let observer: MutationObserver | null = null;
 
+    // Observe image elements in editor to resolve relative preview URLs
     const fixImageUrls = () => {
       if (!hostEl) return;
       const imgs = hostEl.querySelectorAll<HTMLImageElement>("img");
@@ -116,14 +119,65 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
       });
     };
 
+    // Auto-pair () and skip-close handling
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target || !hostEl?.contains(target)) return;
+      if (!target.closest(".vditor-reset")) return;
+
+      if (e.key === "(" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+
+        if (!range.collapsed) {
+          e.preventDefault();
+          const selectedText = range.toString();
+          document.execCommand("insertText", false, `(${selectedText})`);
+          return;
+        }
+
+        e.preventDefault();
+        document.execCommand("insertText", false, "()");
+        selection.modify("move", "backward", "character");
+        return;
+      }
+
+      if (e.key === ")" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const selection = window.getSelection();
+        if (!selection || !selection.isCollapsed || !selection.focusNode) return;
+
+        const node = selection.focusNode;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || "";
+          const offset = selection.focusOffset;
+          if (offset < text.length && text[offset] === ")") {
+            e.preventDefault();
+            selection.modify("move", "forward", "character");
+          }
+        }
+      }
+    };
+
     if (hostEl) {
       observer = new MutationObserver(() => {
         fixImageUrls();
       });
-      observer.observe(hostEl, { childList: true, subtree: true, attributes: true, attributeFilter: ["src"] });
+      observer.observe(hostEl, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["src"],
+      });
+      hostEl.addEventListener("keydown", handleKeyDown, true);
     }
 
     return () => {
+      if (hostEl) {
+        hostEl.removeEventListener("keydown", handleKeyDown, true);
+      }
       observer?.disconnect();
       try {
         if (vditorInstance) {
@@ -142,15 +196,24 @@ export const VditorEditor: React.FC<VditorEditorProps> = ({
     const editor = editorRef.current;
     if (!editor) return;
 
+    // Skip echo when the value change originated from the editor's local input
+    if (value === lastEmittedValueRef.current) {
+      return;
+    }
+
     try {
       const current = editor.getValue();
-      if (current !== value) {
-        syncingRef.current = true;
-        editor.setValue(value);
-        syncingRef.current = false;
+      if (current === value) {
+        lastEmittedValueRef.current = value;
+        return;
       }
+      syncingRef.current = true;
+      editor.setValue(value);
+      lastEmittedValueRef.current = value;
     } catch {
       // ignore get/setValue timing errors
+    } finally {
+      syncingRef.current = false;
     }
   }, [value]);
 

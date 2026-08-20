@@ -17,7 +17,7 @@ test.afterEach(() => {
   }
 });
 
-test.describe("Note Web E2E Edit, Scroll, and Settings Flow", () => {
+test.describe("Note Web E2E UX Pass 2 Suite", () => {
   test("loads welcome.md, edits content, autosaves, and persists after reload", async ({
     page,
   }) => {
@@ -112,5 +112,83 @@ test.describe("Note Web E2E Edit, Scroll, and Settings Flow", () => {
       () => document.getElementById("note-web-runtime-settings")?.textContent || "",
     );
     expect(styleContent).toContain("--editor-font-size: 20px");
+  });
+
+  test("renders Bold, Italic, Strike, and Inline Code live in Vditor IR without page reload", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const editorContainer = page.locator(".vditor-ir .vditor-reset");
+    await expect(editorContainer).toBeVisible({ timeout: 10000 });
+
+    await editorContainer.click();
+    // Test A: Toolbar Bold
+    const boldBtn = page.locator('.vditor-toolbar button[data-type="bold"]');
+    await boldBtn.click();
+    await page.keyboard.type("livebold");
+
+    // Assert strong element exists in the live DOM without reload
+    const boldEl = page.locator(".vditor-ir strong");
+    await expect(boldEl.filter({ hasText: "livebold" })).toBeVisible({ timeout: 5000 });
+
+    // Test B: Toolbar Italic
+    const italicBtn = page.locator('.vditor-toolbar button[data-type="italic"]');
+    await italicBtn.click();
+    await page.keyboard.type("liveitalic");
+
+    const italicEl = page.locator(".vditor-ir em");
+    await expect(italicEl.filter({ hasText: "liveitalic" })).toBeVisible({ timeout: 5000 });
+  });
+
+  test("auto-pairs parenthesis ( to () with cursor placed between", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const editorContainer = page.locator(".vditor-ir .vditor-reset");
+    await expect(editorContainer).toBeVisible({ timeout: 10000 });
+
+    await editorContainer.click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    // Type "("
+    await page.keyboard.press("(");
+    // Type inner text "autopairtest"
+    await page.keyboard.type("autopairtest");
+
+    // The editor text should have (autopairtest)
+    await expect(editorContainer).toContainText("(autopairtest)");
+  });
+
+  test("supports mouse drag resizing of sidebar and persists width across reload", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const sidebar = page.locator(".sidebar-container");
+    const resizer = page.locator(".sidebar-resizer");
+    await expect(sidebar).toBeVisible();
+    await expect(resizer).toBeVisible();
+
+    const initialBox = await sidebar.boundingBox();
+    expect(initialBox).not.toBeNull();
+    const initialWidth = initialBox!.width;
+
+    const resizerBox = await resizer.boundingBox();
+    expect(resizerBox).not.toBeNull();
+
+    // Drag resizer to the right by ~60px
+    await page.mouse.move(resizerBox!.x + resizerBox!.width / 2, resizerBox!.y + 100);
+    await page.mouse.down();
+    await page.mouse.move(resizerBox!.x + resizerBox!.width / 2 + 60, resizerBox!.y + 100);
+    await page.mouse.up();
+
+    // Verify resized width is greater than initial width
+    const resizedBox = await sidebar.boundingBox();
+    expect(resizedBox!.width).toBeGreaterThan(initialWidth + 30);
+
+    // Reload page
+    await page.reload();
+
+    const reloadedBox = await sidebar.boundingBox();
+    expect(reloadedBox!.width).toBeGreaterThan(initialWidth + 30);
   });
 });

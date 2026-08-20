@@ -11,6 +11,7 @@ export interface AppSettings {
   editorPaddingX: number;
   uiFont: string;
   monoFont: string;
+  sidebarWidth: number;
 }
 
 export const SETTINGS_KEY = "note-web-settings-v1";
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
   monoFont:
     'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  sidebarWidth: 280,
 };
 
 export function loadSettings(): AppSettings {
@@ -79,6 +81,7 @@ export function applySettings(
   --editor-line-height: ${settings.editorLineHeight};
   --editor-max-width: ${maxWidth};
   --editor-padding-x: ${settings.editorPaddingX}px;
+  --sidebar-width: ${settings.sidebarWidth}px;
 }
   `;
 }

@@ -41,7 +41,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="topbar-left">
         <IconButton
           icon={<PanelLeft size={18} />}
-          label={sidebarOpen ? "隐藏侧边栏 (Ctrl+B)" : "显示侧边栏 (Ctrl+B)"}
+          label={sidebarOpen ? "隐藏侧边栏 (Ctrl+Shift+B)" : "显示侧边栏 (Ctrl+Shift+B)"}
           onClick={onToggleSidebar}
           size="sm"
         />
