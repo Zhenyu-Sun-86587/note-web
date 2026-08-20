@@ -67,11 +67,11 @@ function getFilenamesInFolder(tree: TreeNode[], folderPath: string): string[] {
     .map((item) => item.name);
 }
 
-function findPathInTree(items: TreeNode[], targetPath: string): boolean {
+function hasNotePath(items: TreeNode[], targetPath: string): boolean {
   for (const item of items) {
-    if (item.path === targetPath) return true;
+    if (item.type === "note" && item.path === targetPath) return true;
     if (item.type === "folder" && item.children) {
-      if (findPathInTree(item.children, targetPath)) return true;
+      if (hasNotePath(item.children, targetPath)) return true;
     }
   }
   return false;
@@ -274,7 +274,7 @@ export default function App() {
         lastPath = null;
       }
 
-      if (lastPath && findPathInTree(tree, lastPath)) {
+      if (lastPath && hasNotePath(tree, lastPath)) {
         handleOpenNote(lastPath);
         const ancestors = getAncestorFolders(lastPath);
         if (ancestors.length > 0) {

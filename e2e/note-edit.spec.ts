@@ -673,8 +673,10 @@ test.describe("Note Web E2E Suite", () => {
 
     // Verify Vditor editor is mounted with the typed Vim text intact
     const reloadedVditor = page.locator(".vditor-ir .vditor-reset");
-    await expect(reloadedVditor).toBeVisible();
-    await expect(reloadedVditor).toContainText("ImmediateVimText");
+    await expect(reloadedVditor).toBeVisible({ timeout: 10000 });
+    await expect(reloadedVditor).toContainText("ImmediateVimText", {
+      timeout: 10000,
+    });
   });
 
   test("executes native Vim motions, operators (dw, u, Ctrl+R), search, and Ex commands (:w, :ir)", async ({
@@ -940,6 +942,42 @@ test.describe("Note Web E2E Suite", () => {
     expect(dialogPopped).toBe(false);
   });
 
+  test("Session Resume: does not fetch folder as note and falls back to first note when last path is folder", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator(".vditor-ir .vditor-reset")).toBeVisible({
+      timeout: 10000,
+    });
+
+    let folderFetchRequested = false;
+    await page.route("**/api/note?path=projects", (route) => {
+      folderFetchRequested = true;
+      route.abort();
+    });
+
+    // Set folder path "projects" in localStorage
+    await page.evaluate(() => {
+      localStorage.setItem("note-web-last-open-note-v1", "projects");
+    });
+
+    let dialogPopped = false;
+    page.on("dialog", (dialog) => {
+      dialogPopped = true;
+      dialog.dismiss();
+    });
+
+    // Reload -> should not attempt to fetch "projects" as a note, discard it, and open first available note
+    await page.reload();
+    await expect(page.locator(".topbar-path")).toContainText(
+      "inbox/welcome.md",
+      { timeout: 10000 },
+    );
+
+    expect(dialogPopped).toBe(false);
+    expect(folderFetchRequested).toBe(false);
+  });
+
   test("Startup Note Policy: respects startupNoteMode ('none' and 'first')", async ({
     page,
   }) => {
@@ -985,7 +1023,6 @@ test.describe("Note Web E2E Suite", () => {
     page,
   }) => {
     await page.goto("/");
-    // Switch to VIM mode
     const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
       hasText: "VIM",
     });
@@ -993,42 +1030,58 @@ test.describe("Note Web E2E Suite", () => {
 
     const cmContent = page.locator(".note-web-vim-editor .cm-content");
     await expect(cmContent).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(".topbar-path")).toContainText("inbox/welcome.md");
 
-    // Open projects/example.md
-    const exampleNote = page
-      .locator(".tree-note")
-      .filter({ hasText: "example" })
-      .first();
-    const isExampleVisible = await exampleNote.isVisible();
-    if (!isExampleVisible) {
-      const projectsFolder = page
-        .locator(".tree-folder")
-        .filter({ hasText: "projects" })
-        .first();
-      await projectsFolder.click();
-    }
-    await exampleNote.click();
-    await expect(page.locator(".topbar-path")).toContainText(
-      "projects/example.md",
-    );
+    // 1. Record original content and ensure clean note
+    const originalContent = fs.readFileSync(welcomeFixturePath, "utf8");
+    await expect(cmContent).toContainText("Welcome to Note Web");
 
-    // Switch back to inbox/welcome.md to test clean external reload
-    const welcomeNote = page
-      .locator(".tree-note")
-      .filter({ hasText: "welcome" })
-      .first();
-    await welcomeNote.click();
-    await expect(page.locator(".topbar-path")).toContainText(
-      "inbox/welcome.md",
-    );
+    // 2. Direct external edit on the same note file on disk
+    const externalContent = "# External Note Title\n\nExternal sync body content.";
+    fs.writeFileSync(welcomeFixturePath, externalContent, "utf8");
 
-    // Focus editor in Normal mode and press 'u'
+    // 3. Trigger window focus event to sync external changes
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+
+    // 4. Wait for Vim editor to display the external content
+    await expect(cmContent).toContainText("External Note Title");
+    await expect(cmContent).toContainText("External sync body content.");
+
+    // 5. In Normal mode, press 'u' -> must NOT revert to previous original content
     await cmContent.click();
     await page.keyboard.press("Escape");
     await page.keyboard.press("u");
 
-    // The content remains intact and does not undo to previous note or previous state
-    await expect(cmContent).toContainText("Welcome to Note Web");
+    await expect(cmContent).toContainText("External Note Title");
+    await expect(cmContent).toContainText("External sync body content.");
+
+    // 6. Test local user edits still undo/redo normally
+    await page.keyboard.press("i");
+    await page.keyboard.type("LOCAL_USER_EDIT ");
+    await page.keyboard.press("Escape");
+
+    await expect(cmContent).toContainText("LOCAL_USER_EDIT");
+
+    // Undo local edit
+    await page.keyboard.press("u");
+    await expect(cmContent).not.toContainText("LOCAL_USER_EDIT");
+
+    // Redo local edit
+    await page.keyboard.press(":");
+    await page.keyboard.type("redo");
+    await page.keyboard.press("Enter");
+    await expect(cmContent).toContainText("LOCAL_USER_EDIT");
+
+    // 7. Clean up local edit before restoring fixture file on disk
+    await page.keyboard.press("u");
+    await expect(cmContent).not.toContainText("LOCAL_USER_EDIT");
+
+    // Restore fixture file on disk
+    fs.writeFileSync(welcomeFixturePath, originalContent, "utf8");
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(cmContent).toContainText("Welcome to Note Web", {
+      timeout: 10000,
+    });
   });
 
   test("Vim Ergonomics: hybrid relative line numbers with single gutter and dynamic cursor updates", async ({
@@ -1256,7 +1309,7 @@ test.describe("Note Web E2E Suite", () => {
     await cmContent.click();
     await page.keyboard.press("Escape");
 
-    // 1. Insert 3 new sample lines
+    // 1. Insert 4 new sample lines: itemalpha, itembeta, itemgamma, itemdelta
     await page.keyboard.press("G");
     await page.keyboard.press("o");
     await page.keyboard.type("itemalpha");
@@ -1264,13 +1317,15 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.type("itembeta");
     await page.keyboard.press("Enter");
     await page.keyboard.type("itemgamma");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("itemdelta");
     await page.keyboard.press("Escape");
 
-    // 2. Move to itemalpha: 2k
-    await page.keyboard.press("2");
+    // 2. Move cursor up to itemalpha: 3k
+    await page.keyboard.press("3");
     await page.keyboard.press("k");
 
-    // 3. Record macro 'a': qa I- <Escape>j q
+    // 3. Record macro 'a': qa I- <Escape>j q (prepends "- " and moves down 1 line)
     await page.keyboard.press("q");
     await page.keyboard.press("a");
     await page.keyboard.press("I");
@@ -1281,21 +1336,23 @@ test.describe("Note Web E2E Suite", () => {
 
     await expect(cmContent).toContainText("- itemalpha");
 
-    // 4. Run macro with count: 1@a on itembeta
-    await page.keyboard.press("1");
+    // 4. Cursor is now at itembeta. Run macro with count 2: 2@a
+    // This executes on itembeta and itemgamma!
+    await page.keyboard.press("2");
     await page.keyboard.press("@");
     await page.keyboard.press("a");
 
     await expect(cmContent).toContainText("- itembeta");
-
-    // 5. Run @@ on itemgamma
-    await page.keyboard.press("@");
-    await page.keyboard.press("@");
-
     await expect(cmContent).toContainText("- itemgamma");
+
+    // 5. Cursor is now at itemdelta. Run @@ on itemdelta
+    await page.keyboard.press("@");
+    await page.keyboard.press("@");
+
+    await expect(cmContent).toContainText("- itemdelta");
   });
 
-  test("Vim Advanced: macro and named register persistence across tab reload", async ({
+  test("Vim Advanced: macro with backspace and named register persistence across tab reload", async ({
     page,
   }) => {
     await page.goto("/");
@@ -1309,32 +1366,41 @@ test.describe("Note Web E2E Suite", () => {
     await cmContent.click();
     await page.keyboard.press("Escape");
 
-    // 1. Record macro 'a': qa I[M] <Escape>j q
+    // 1. Record macro 'a' with Backspace: qa i abc <Backspace> d <Escape> q -> inserts "abd"
     await page.keyboard.press("G");
     await page.keyboard.press("o");
-    await page.keyboard.type("persistedone");
     await page.keyboard.press("Escape");
 
     await page.keyboard.press("q");
     await page.keyboard.press("a");
-    await page.keyboard.press("I");
-    await page.keyboard.type("[M] ");
+    await page.keyboard.press("i");
+    await page.keyboard.type("abc");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type("d");
     await page.keyboard.press("Escape");
     await page.keyboard.press("q");
 
-    // 2. Set named register 'b'
-    await page.keyboard.press("g");
-    await page.keyboard.press("g");
+    await expect(cmContent).toContainText("abd");
+
+    // 2. Set named register 'b' with unique token
+    const uniqueToken = "REGISTER_B_" + Date.now();
+    await page.keyboard.press("o");
+    await page.keyboard.type(uniqueToken);
+    await page.keyboard.press("Escape");
+
     await page.keyboard.press('"');
     await page.keyboard.press("b");
     await page.keyboard.press("y");
     await page.keyboard.press("y");
 
-    // Verify sessionStorage has saved the session
-    const savedSession = await page.evaluate(() =>
+    // Verify sessionStorage has saved the session with register 'b' containing unique token
+    const rawSession = await page.evaluate(() =>
       sessionStorage.getItem("note-web-vim-session-v1"),
     );
-    expect(savedSession).not.toBeNull();
+    expect(rawSession).not.toBeNull();
+    const sessionObj = JSON.parse(rawSession || "{}");
+    expect(sessionObj.registers?.b?.keyBuffer?.join("")).toContain(uniqueToken);
+    expect(sessionObj.latestMacroRegister).toBe("a");
 
     // 3. Reload page and re-enter Vim mode
     await page.reload();
@@ -1348,23 +1414,37 @@ test.describe("Note Web E2E Suite", () => {
     await cmContentAfter.click();
     await page.keyboard.press("Escape");
 
-    // 4. Create target line and execute restored macro @a on it
+    // 4. Test restored macro @a on reloaded page
     await page.keyboard.press("G");
     await page.keyboard.press("o");
-    await page.keyboard.type("persistedtarget");
     await page.keyboard.press("Escape");
 
     await page.keyboard.press("@");
     await page.keyboard.press("a");
 
-    await expect(cmContentAfter).toContainText("[M] persistedtarget");
+    // Verify macro with Backspace inserted "abd"
+    await expect(cmContentAfter).toContainText("abd");
 
-    // 5. Paste restored register "b
+    // 5. Test restored latestMacroRegister with @@
+    await page.keyboard.press("o");
+    await page.keyboard.press("Escape");
+
+    await page.keyboard.press("@");
+    await page.keyboard.press("@");
+
+    // Count occurrences of "abd"
+    const contentText = await cmContentAfter.textContent();
+    const matches = contentText?.match(/abd/g) || [];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
+
+    // 6. Paste restored register "b
+    await page.keyboard.press("o");
+    await page.keyboard.press("Escape");
     await page.keyboard.press('"');
     await page.keyboard.press("b");
     await page.keyboard.press("p");
 
-    await expect(cmContentAfter).toContainText("# Welcome to Note Web");
+    await expect(cmContentAfter).toContainText(uniqueToken);
 
     // Clean up sessionStorage
     await page.evaluate(() =>

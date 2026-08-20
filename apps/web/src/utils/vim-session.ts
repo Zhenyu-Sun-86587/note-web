@@ -51,7 +51,13 @@ export function restoreVimSessionOnce(): void {
                       c.keyName &&
                       (Vim as any).InsertModeKey
                     ) {
-                      return new (Vim as any).InsertModeKey(c.keyName);
+                      return new (Vim as any).InsertModeKey(c.keyName, {
+                        key: c.key ?? c.keyName ?? "",
+                        ctrlKey: Boolean(c.ctrlKey),
+                        altKey: Boolean(c.altKey),
+                        metaKey: Boolean(c.metaKey),
+                        shiftKey: Boolean(c.shiftKey),
+                      });
                     }
                     return c;
                   }),

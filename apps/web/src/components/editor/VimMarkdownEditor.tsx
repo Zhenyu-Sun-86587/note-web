@@ -42,7 +42,7 @@ import {
   searchKeymap,
 } from "@codemirror/search";
 import { markdown } from "@codemirror/lang-markdown";
-import { vim, Vim } from "@replit/codemirror-vim";
+import { vim, Vim, getCM } from "@replit/codemirror-vim";
 import type { EditorHandle } from "./EditorHandle";
 import {
   restoreVimSessionOnce,
@@ -247,14 +247,13 @@ export const VimMarkdownEditor = forwardRef<
           lastEmittedValueRef.current = docString;
           onChangeRef.current(docString);
         }
-        persistVimSession();
       });
 
       // 1. Intercept Ctrl shortcuts to prevent browser hijacking (e.g. Ctrl+R reload, Ctrl+P print, Ctrl+F find, etc.)
       const vimKeyInterceptor = EditorView.domEventHandlers({
         keydown: (e, _view) => {
-          // Persist session if recording macro or executing commands
-          if (e.key === "q" || e.ctrlKey || e.key === "Escape") {
+          // Narrow fallback persist if recording macro q or Escape
+          if (e.key === "q" || e.key === "Escape") {
             queueMicrotask(persistVimSession);
           }
 
@@ -382,7 +381,16 @@ export const VimMarkdownEditor = forwardRef<
 
       viewRef.current = view;
 
+      const cm = getCM(view);
+      const persistAfterVimCommand = () => {
+        persistVimSession();
+      };
+      (cm as any)?.on?.("vim-command-done", persistAfterVimCommand);
+      (cm as any)?.on?.("vim-keypress", persistAfterVimCommand);
+
       return () => {
+        (cm as any)?.off?.("vim-command-done", persistAfterVimCommand);
+        (cm as any)?.off?.("vim-keypress", persistAfterVimCommand);
         persistVimSession();
         view.destroy();
         viewRef.current = null;
