@@ -660,10 +660,13 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toContainText("ImmediateIRText");
 
     // 2. Type in VIM (in Insert mode) and immediately switch to IR
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
     await cmContent.click();
     await page.keyboard.press("i");
+    await expect(vimPanel).toContainText("INSERT");
     await page.keyboard.type(" ImmediateVimText");
     await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
 
     await irBtn.click();
     await expect(irBtn).toHaveClass(/active/);
@@ -1026,5 +1029,346 @@ test.describe("Note Web E2E Suite", () => {
 
     // The content remains intact and does not undo to previous note or previous state
     await expect(cmContent).toContainText("Welcome to Note Web");
+  });
+
+  test("Vim Ergonomics: hybrid relative line numbers with single gutter and dynamic cursor updates", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmEditor = page.locator(".note-web-vim-editor");
+    await expect(cmEditor).toBeVisible({ timeout: 10000 });
+
+    // Verify there is EXACTLY ONE line-number gutter column in the DOM
+    const lineGutterCols = page.locator(".note-web-vim-editor .cm-lineNumbers");
+    await expect(lineGutterCols).toHaveCount(1);
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("g");
+    await page.keyboard.press("g");
+
+    // In CodeMirror, gutter element 0 is the spacer. Visible line 1 is nth(1), line 2 is nth(2), line 3 is nth(3)
+    const gutterElements = page.locator(
+      ".note-web-vim-editor .cm-lineNumbers .cm-gutterElement",
+    );
+    await expect(gutterElements.nth(1)).toHaveText("1");
+    await expect(gutterElements.nth(2)).toHaveText("1");
+    await expect(gutterElements.nth(3)).toHaveText("2");
+
+    // Move cursor down 1 line with 'j': line 2 becomes active ('2'), line 1 becomes '1', line 3 becomes '1'
+    await page.keyboard.press("j");
+    await expect(gutterElements.nth(1)).toHaveText("1");
+    await expect(gutterElements.nth(2)).toHaveText("2");
+    await expect(gutterElements.nth(3)).toHaveText("1");
+
+    // Open Settings and disable relative line numbers -> numbers should become absolute 1, 2, 3
+    const settingsBtn = page.locator("button[aria-label='设置']");
+    await settingsBtn.click();
+    const settingsModal = page.locator(".settings-dialog");
+    await expect(settingsModal).toBeVisible();
+
+    const relCheck = settingsModal
+      .locator(".settings-row", { hasText: "相对行号" })
+      .locator("input[type='checkbox']");
+    await relCheck.uncheck();
+
+    const doneBtn = settingsModal.locator("button", { hasText: "完成" });
+    await doneBtn.click();
+    await expect(settingsModal).not.toBeVisible();
+
+    // Verify gutter elements now show standard absolute numbers
+    await expect(gutterElements.nth(1)).toHaveText("1");
+    await expect(gutterElements.nth(2)).toHaveText("2");
+    await expect(gutterElements.nth(3)).toHaveText("3");
+  });
+
+  test("Vim Ergonomics: line wrapping setting toggles without recreating editor", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible();
+    await expect(cmContent).toHaveClass(/cm-lineWrapping/);
+
+    // Open Settings and disable line wrapping
+    const settingsBtn = page.locator("button[aria-label='设置']");
+    await settingsBtn.click();
+    const settingsModal = page.locator(".settings-dialog");
+    await expect(settingsModal).toBeVisible();
+
+    const wrapCheck = settingsModal
+      .locator(".settings-row", { hasText: "自动换行" })
+      .locator("input[type='checkbox']");
+    await wrapCheck.uncheck();
+
+    const doneBtn = settingsModal.locator("button", { hasText: "完成" });
+    await doneBtn.click();
+    await expect(settingsModal).not.toBeVisible();
+
+    // Verify .cm-lineWrapping class is removed
+    await expect(cmContent).not.toHaveClass(/cm-lineWrapping/);
+  });
+
+  test("Vim Ergonomics: jj escapes from Insert mode when enabled", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    // 1. Enable jjEscape in Settings
+    const settingsBtn = page.locator("button[aria-label='设置']");
+    await settingsBtn.click();
+    const settingsModal = page.locator(".settings-dialog");
+    await expect(settingsModal).toBeVisible();
+
+    const jjCheck = settingsModal
+      .locator(".settings-row", { hasText: "jj 退出插入模式" })
+      .locator("input[type='checkbox']");
+    await jjCheck.check();
+
+    const doneBtn = settingsModal.locator("button", { hasText: "完成" });
+    await doneBtn.click();
+    await expect(settingsModal).not.toBeVisible();
+
+    // 2. Switch to Vim mode
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+
+    // 3. Press i, type text, then type jj
+    await page.keyboard.press("i");
+    await expect(vimPanel).toContainText("INSERT");
+
+    await page.keyboard.type("hellotext");
+    await page.keyboard.type("jj");
+
+    // 4. Verify returned to NORMAL mode and 'jj' is not in document
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toContainText("hellotext");
+    await expect(cmContent).not.toContainText("hellotextjj");
+  });
+
+  test("Vim Advanced: lowercase marks and jumping within active note", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+
+    // Go to top and set mark 'a'
+    await page.keyboard.press("g");
+    await page.keyboard.press("g");
+    await page.keyboard.press("m");
+    await page.keyboard.press("a");
+
+    // Jump to bottom with 'G'
+    await page.keyboard.press("G");
+
+    // Jump back to mark 'a' with `a
+    await page.keyboard.press("`");
+    await page.keyboard.press("a");
+
+    // Type 'x' to delete the first character '#' and verify
+    await page.keyboard.press("x");
+    await expect(cmContent).not.toContainText("# Welcome to Note Web");
+    await expect(cmContent).toContainText(" Welcome to Note Web");
+
+    // Undo
+    await page.keyboard.press("u");
+    await expect(cmContent).toContainText("# Welcome to Note Web");
+  });
+
+  test("Vim Advanced: named registers and black-hole register", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+
+    // 1. Yank first line into register 'a': "ayy
+    await page.keyboard.press("g");
+    await page.keyboard.press("g");
+    await page.keyboard.press('"');
+    await page.keyboard.press("a");
+    await page.keyboard.press("y");
+    await page.keyboard.press("y");
+
+    // 2. Go to end and paste from register 'a': "ap
+    await page.keyboard.press("G");
+    await page.keyboard.press('"');
+    await page.keyboard.press("a");
+    await page.keyboard.press("p");
+
+    // 3. Delete with black-hole register: "_dd
+    await page.keyboard.press('"');
+    await page.keyboard.press("_");
+    await page.keyboard.press("d");
+    await page.keyboard.press("d");
+
+    // 4. Paste again from register 'a': "ap -> should still contain original line
+    await page.keyboard.press('"');
+    await page.keyboard.press("a");
+    await page.keyboard.press("p");
+
+    await expect(cmContent).toContainText("# Welcome to Note Web");
+  });
+
+  test("Vim Advanced: macros recording, playback with count, and @@", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+
+    // 1. Insert 3 new sample lines
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("itemalpha");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("itembeta");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("itemgamma");
+    await page.keyboard.press("Escape");
+
+    // 2. Move to itemalpha: 2k
+    await page.keyboard.press("2");
+    await page.keyboard.press("k");
+
+    // 3. Record macro 'a': qa I- <Escape>j q
+    await page.keyboard.press("q");
+    await page.keyboard.press("a");
+    await page.keyboard.press("I");
+    await page.keyboard.type("- ");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("j");
+    await page.keyboard.press("q");
+
+    await expect(cmContent).toContainText("- itemalpha");
+
+    // 4. Run macro with count: 1@a on itembeta
+    await page.keyboard.press("1");
+    await page.keyboard.press("@");
+    await page.keyboard.press("a");
+
+    await expect(cmContent).toContainText("- itembeta");
+
+    // 5. Run @@ on itemgamma
+    await page.keyboard.press("@");
+    await page.keyboard.press("@");
+
+    await expect(cmContent).toContainText("- itemgamma");
+  });
+
+  test("Vim Advanced: macro and named register persistence across tab reload", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+
+    // 1. Record macro 'a': qa I[M] <Escape>j q
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("persistedone");
+    await page.keyboard.press("Escape");
+
+    await page.keyboard.press("q");
+    await page.keyboard.press("a");
+    await page.keyboard.press("I");
+    await page.keyboard.type("[M] ");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("q");
+
+    // 2. Set named register 'b'
+    await page.keyboard.press("g");
+    await page.keyboard.press("g");
+    await page.keyboard.press('"');
+    await page.keyboard.press("b");
+    await page.keyboard.press("y");
+    await page.keyboard.press("y");
+
+    // Verify sessionStorage has saved the session
+    const savedSession = await page.evaluate(() =>
+      sessionStorage.getItem("note-web-vim-session-v1"),
+    );
+    expect(savedSession).not.toBeNull();
+
+    // 3. Reload page and re-enter Vim mode
+    await page.reload();
+    const vimBtnAfter = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtnAfter.click();
+
+    const cmContentAfter = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContentAfter).toBeVisible();
+    await cmContentAfter.click();
+    await page.keyboard.press("Escape");
+
+    // 4. Create target line and execute restored macro @a on it
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("persistedtarget");
+    await page.keyboard.press("Escape");
+
+    await page.keyboard.press("@");
+    await page.keyboard.press("a");
+
+    await expect(cmContentAfter).toContainText("[M] persistedtarget");
+
+    // 5. Paste restored register "b
+    await page.keyboard.press('"');
+    await page.keyboard.press("b");
+    await page.keyboard.press("p");
+
+    await expect(cmContentAfter).toContainText("# Welcome to Note Web");
+
+    // Clean up sessionStorage
+    await page.evaluate(() =>
+      sessionStorage.removeItem("note-web-vim-session-v1"),
+    );
   });
 });

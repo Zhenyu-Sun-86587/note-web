@@ -149,4 +149,51 @@ describe("useKeyboardShortcuts hook", () => {
     vimContainer.remove();
     modal.remove();
   });
+
+  it("handles Mac Cmd vs Vim Ctrl semantics properly", () => {
+    const onSave = vi.fn();
+    renderHook(() => useKeyboardShortcuts({ onSave }));
+
+    const vimContainer = document.createElement("div");
+    vimContainer.className = "note-web-vim-editor";
+    const vimEditor = document.createElement("div");
+    vimEditor.className = "cm-editor";
+    vimContainer.appendChild(vimEditor);
+    document.body.appendChild(vimContainer);
+
+    // 1. Vim Ctrl+R inside Vim: intercepted and prevented from browser reload
+    const vimCtrlR = new KeyboardEvent("keydown", {
+      key: "r",
+      ctrlKey: true,
+      metaKey: false,
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventedCtrlR = !vimEditor.dispatchEvent(vimCtrlR);
+    expect(preventedCtrlR).toBe(true);
+
+    // 2. Mac Cmd+R inside Vim: NOT prevented by useKeyboardShortcuts (delegated to browser)
+    const macCmdR = new KeyboardEvent("keydown", {
+      key: "r",
+      ctrlKey: false,
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventedCmdR = !vimEditor.dispatchEvent(macCmdR);
+    expect(preventedCmdR).toBe(false);
+
+    // 3. Mac Cmd+S inside Vim: triggers onSave and prevents default
+    const macCmdS = new KeyboardEvent("keydown", {
+      key: "s",
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventedCmdS = !vimEditor.dispatchEvent(macCmdS);
+    expect(onSave).toHaveBeenCalled();
+    expect(preventedCmdS).toBe(true);
+
+    vimContainer.remove();
+  });
 });

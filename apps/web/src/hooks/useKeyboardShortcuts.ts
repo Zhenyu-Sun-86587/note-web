@@ -25,7 +25,12 @@ export function useKeyboardShortcuts(options: ShortcutsOptions) {
       const mod = isMac ? e.metaKey : e.ctrlKey;
 
       // Save: Ctrl/Cmd + S is always intercepted and handled
-      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s") {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === "s"
+      ) {
         e.preventDefault();
         options.onSave?.();
         return;

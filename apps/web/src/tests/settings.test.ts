@@ -106,4 +106,29 @@ describe("useSettings and settings management", () => {
     const loaded = loadSettings();
     expect(loaded.startupNoteMode).toBe("last");
   });
+
+  it("persists and updates Vim settings (relativeLineNumbers, lineWrapping, jjEscape)", () => {
+    const { result } = renderHook(() => useSettings());
+
+    expect(result.current.settings.vimRelativeLineNumbers).toBe(true);
+    expect(result.current.settings.vimLineWrapping).toBe(true);
+    expect(result.current.settings.vimJjEscape).toBe(false);
+
+    act(() => {
+      result.current.updateSetting("vimRelativeLineNumbers", false);
+      result.current.updateSetting("vimLineWrapping", false);
+      result.current.updateSetting("vimJjEscape", true);
+    });
+
+    expect(result.current.settings.vimRelativeLineNumbers).toBe(false);
+    expect(result.current.settings.vimLineWrapping).toBe(false);
+    expect(result.current.settings.vimJjEscape).toBe(true);
+
+    const savedRaw = localStorage.getItem(SETTINGS_KEY);
+    expect(savedRaw).not.toBeNull();
+    const saved = JSON.parse(savedRaw!);
+    expect(saved.vimRelativeLineNumbers).toBe(false);
+    expect(saved.vimLineWrapping).toBe(false);
+    expect(saved.vimJjEscape).toBe(true);
+  });
 });

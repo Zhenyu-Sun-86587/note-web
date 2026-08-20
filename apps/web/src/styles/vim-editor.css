@@ -52,6 +52,13 @@
   font-size: 12px;
 }
 
+.note-web-vim-editor .cm-lineNumbers .cm-gutterElement {
+  min-width: 32px;
+  text-align: right;
+  padding: 0 6px;
+  box-sizing: border-box;
+}
+
 .note-web-vim-editor .cm-activeLineGutter {
   background-color: var(--hover-bg);
   color: var(--text-primary);

@@ -12,6 +12,9 @@ export interface EditorPaneProps {
   hasConflict: boolean;
   theme: Theme;
   editorMode: "ir" | "vim";
+  vimRelativeLineNumbers?: boolean;
+  vimLineWrapping?: boolean;
+  vimJjEscape?: boolean;
   onChange: (value: string) => void;
   onNewNote: () => void;
   onReloadConflict: () => void;
@@ -29,6 +32,9 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       hasConflict,
       theme,
       editorMode,
+      vimRelativeLineNumbers,
+      vimLineWrapping,
+      vimJjEscape,
       onChange,
       onNewNote,
       onReloadConflict,
@@ -69,6 +75,9 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
               ref={activeEditorRef}
               value={initialContent}
               theme={theme}
+              vimRelativeLineNumbers={vimRelativeLineNumbers}
+              vimLineWrapping={vimLineWrapping}
+              vimJjEscape={vimJjEscape}
               onChange={onChange}
               onSave={onSave}
               onSwitchToIR={onSwitchToIR}

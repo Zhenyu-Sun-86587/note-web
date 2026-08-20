@@ -8,6 +8,9 @@ export interface AppSettings {
   theme: ThemePreference;
   editorMode: EditorMode;
   startupNoteMode: StartupNoteMode;
+  vimRelativeLineNumbers: boolean;
+  vimLineWrapping: boolean;
+  vimJjEscape: boolean;
   editorFont: string;
   editorFontSize: number;
   editorLineHeight: number;
@@ -25,6 +28,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
   editorMode: "ir",
   startupNoteMode: "last",
+  vimRelativeLineNumbers: true,
+  vimLineWrapping: true,
+  vimJjEscape: false,
   editorFont:
     '"NoteWeb CJK", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif',
   editorFontSize: 16,

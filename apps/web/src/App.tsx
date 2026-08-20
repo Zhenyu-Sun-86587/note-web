@@ -785,6 +785,9 @@ export default function App() {
         hasConflict={saveStatus === "conflict"}
         theme={effectiveTheme}
         editorMode={editorMode}
+        vimRelativeLineNumbers={settings.vimRelativeLineNumbers}
+        vimLineWrapping={settings.vimLineWrapping}
+        vimJjEscape={settings.vimJjEscape}
         onChange={(val) => setDraftContent(val)}
         onNewNote={() => {
           setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");

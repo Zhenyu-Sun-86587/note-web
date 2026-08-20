@@ -216,6 +216,61 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </div>
           </div>
 
+          {/* Vim Section */}
+          <div className="settings-section">
+            <div className="settings-section-title">Vim</div>
+            <div className="settings-row">
+              <div className="settings-label">相对行号</div>
+              <label className="settings-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settings.vimRelativeLineNumbers}
+                  onChange={(e) =>
+                    onUpdateSetting("vimRelativeLineNumbers", e.target.checked)
+                  }
+                />
+                启用 (Hybrid Relative Numbers)
+              </label>
+            </div>
+            <div className="settings-row">
+              <div className="settings-label">自动换行</div>
+              <label className="settings-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settings.vimLineWrapping}
+                  onChange={(e) =>
+                    onUpdateSetting("vimLineWrapping", e.target.checked)
+                  }
+                />
+                启用 (Line Wrapping)
+              </label>
+            </div>
+            <div className="settings-row">
+              <div className="settings-label">jj 退出插入模式</div>
+              <label className="settings-checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settings.vimJjEscape}
+                  onChange={(e) =>
+                    onUpdateSetting("vimJjEscape", e.target.checked)
+                  }
+                />
+                启用 (Map jj to Escape)
+              </label>
+            </div>
+            <div
+              className="settings-hint"
+              style={{
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                marginTop: "6px",
+                lineHeight: "1.4",
+              }}
+            >
+              寄存器与宏：当前浏览器标签页会话内保存；关闭标签页后清除。
+            </div>
+          </div>
+
           {/* Editor Section */}
           <div className="settings-section">
             <div className="settings-section-title">编辑器 (Editor)</div>
