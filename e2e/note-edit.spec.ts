@@ -746,7 +746,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(vditorEditor).toContainText("secondword thirdword");
   });
 
-  test("handles Chinese IME in Vim Insert mode and returns to Normal mode smoothly", async ({
+  test("handles Chinese IME and blocks text input outside Insert mode", async ({
     page,
   }) => {
     await page.goto("/");
@@ -758,21 +758,52 @@ test.describe("Note Web E2E Suite", () => {
     const cmContent = page.locator(".note-web-vim-editor .cm-content");
     const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
     await expect(cmContent).toBeVisible();
-
     await cmContent.click();
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // A. NORMAL text-input regression:
+    // In NORMAL mode, page.keyboard.insertText simulates IME commit / direct text input path.
+    // Document must remain completely unchanged and panel remains NORMAL.
+    const originalDoc = await cmContent.textContent();
+    await page.keyboard.insertText("中文输入法测试NORMAL");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).not.toContainText("中文输入法测试NORMAL");
+    const currentDoc = await cmContent.textContent();
+    expect(currentDoc).toBe(originalDoc);
+
+    // B. VISUAL mode text-input regression:
+    // In VISUAL mode, text input via IME commit must NOT replace selection or insert into doc.
+    await page.keyboard.press("v");
+    await expect(vimPanel).toContainText("VISUAL");
+    await page.keyboard.insertText("中文测试VISUAL");
+    await expect(cmContent).not.toContainText("中文测试VISUAL");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // C. INSERT mode Chinese insertion:
+    // In INSERT mode, Chinese text via IME / insertText must insert properly.
     await page.keyboard.press("G");
     await page.keyboard.press("o");
-    await page.keyboard.type("中文Vim测试文本");
+    await expect(vimPanel).toContainText("INSERT");
+    await page.keyboard.insertText("中文Vim测试文本");
+    await expect(cmContent).toContainText("中文Vim测试文本");
     await page.keyboard.press("Escape");
-
     await expect(vimPanel).toContainText("NORMAL");
     await expect(cmContent).toContainText("中文Vim测试文本");
 
-    // Test dw on Chinese content
+    // D. Normal Vim motions and operations on Chinese text:
     await page.keyboard.press("0");
-    await page.keyboard.press("x"); // delete single character
+    await page.keyboard.press("x"); // delete single character '中'
     await expect(cmContent).toContainText("文Vim测试文本");
     await page.keyboard.press("u"); // undo
+    await expect(cmContent).toContainText("中文Vim测试文本");
+
+    // E. Literal replacement with 'r'
+    await page.keyboard.press("r");
+    await page.keyboard.press("A");
+    await expect(cmContent).toContainText("A文Vim测试文本");
+    await page.keyboard.press("u");
     await expect(cmContent).toContainText("中文Vim测试文本");
   });
 

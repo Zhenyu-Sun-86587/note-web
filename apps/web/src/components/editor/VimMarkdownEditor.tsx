@@ -17,7 +17,7 @@ import {
   highlightSpecialChars,
   keymap,
 } from "@codemirror/view";
-import { EditorState, Transaction, Compartment } from "@codemirror/state";
+import { EditorState, Transaction, Compartment, Prec } from "@codemirror/state";
 import {
   defaultHighlightStyle,
   syntaxHighlighting,
@@ -360,11 +360,40 @@ export const VimMarkdownEditor = forwardRef<
         ]),
       ];
 
+      // Low-priority inputHandler fallback: prevents unconsumed IME composition text
+      // (such as multi-character Chinese text committed via IME) from directly modifying
+      // the document outside of Insert mode, while preserving Insert mode text input and
+      // literal character composition (e.g. f/r/t).
+      const normalModeTextInputGuard = Prec.low(
+        EditorView.inputHandler.of((view, _from, _to, _text) => {
+          const cm = getCM(view);
+          const vimState = cm?.state?.vim;
+
+          // No Vim state -> allow default
+          if (!vimState) return false;
+
+          // In Insert mode -> allow text input
+          if (vimState.insertMode) return false;
+
+          // Ongoing Vim operation -> allow
+          if (cm.curOp?.isVimOp) return false;
+
+          // Special case: codemirror-vim handles literal input (e.g. f/r/t) with IME composition
+          if (vimState.expectLiteralNext && view.composing) {
+            return false;
+          }
+
+          // Outside Insert mode, block all unconsumed text input from directly editing doc
+          return true;
+        }),
+      );
+
       const view = new EditorView({
         doc: value,
         extensions: [
           vimKeyInterceptor,
           vim({ status: true }),
+          normalModeTextInputGuard,
           lineNumberCompartment.of(
             createLineNumberGutter(Boolean(vimRelativeLineNumbers)),
           ),
