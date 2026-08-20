@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import { createTestContext, type TestContext } from "./helpers.js";
@@ -48,5 +51,32 @@ describe("Assets API", () => {
       .expect(400);
 
     expect(res.body.error.code).toBe("INVALID_FILE_TYPE");
+  });
+
+  it("POST /api/assets rejects upload if attachments is a symlink pointing outside vault", async () => {
+    const outsideDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), "note-test-outside-"),
+    );
+    try {
+      const attachmentsLink = path.join(ctx.vaultRoot, "attachments");
+      // Remove existing attachments dir and replace with symlink
+      await fs.promises.rm(attachmentsLink, { recursive: true, force: true });
+      await fs.promises.symlink(outsideDir, attachmentsLink);
+
+      const buffer = Buffer.from("fake-png-binary-data");
+      const res = await request(ctx.app)
+        .post("/api/assets")
+        .field("notePath", "inbox/welcome.md")
+        .attach("file", buffer, "photo.png")
+        .expect(403);
+
+      expect(res.body.error.code).toBe("ACCESS_DENIED");
+
+      // Verify no files were created in outsideDir
+      const outsideFiles = await fs.promises.readdir(outsideDir);
+      expect(outsideFiles.length).toBe(0);
+    } finally {
+      await fs.promises.rm(outsideDir, { recursive: true, force: true });
+    }
   });
 });

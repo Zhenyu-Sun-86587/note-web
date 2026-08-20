@@ -1,4 +1,21 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { test, expect } from "@playwright/test";
+
+const fixturePath = path.resolve(process.cwd(), "test-vault/inbox/welcome.md");
+let originalContent = "";
+
+test.beforeAll(() => {
+  if (fs.existsSync(fixturePath)) {
+    originalContent = fs.readFileSync(fixturePath, "utf8");
+  }
+});
+
+test.afterEach(() => {
+  if (originalContent && fs.existsSync(fixturePath)) {
+    fs.writeFileSync(fixturePath, originalContent, "utf8");
+  }
+});
 
 test.describe("Note Web E2E Edit & Persist Flow", () => {
   test("loads welcome.md, edits content, autosaves, and persists after reload", async ({
@@ -14,7 +31,7 @@ test.describe("Note Web E2E Edit & Persist Flow", () => {
     await expect(editorContainer).toBeVisible({ timeout: 10000 });
 
     // Status bar should indicate Saved or Clean
-    const statusBar = page.locator(".status-bar");
+    const statusBar = page.locator(".statusbar");
     await expect(statusBar).toBeVisible();
 
     // Verify initial note heading is visible
@@ -25,8 +42,8 @@ test.describe("Note Web E2E Edit & Persist Flow", () => {
     await editorContainer.click();
     await page.keyboard.type(`\n\n${uniqueText}\n`);
 
-    // Wait for autosave debouncer and API save to complete (status goes dirty -> saving -> saved)
-    await expect(statusBar).toContainText("Saved", { timeout: 8000 });
+    // Wait for autosave debouncer and API save to complete (status goes dirty -> saving -> 已保存)
+    await expect(statusBar).toContainText("已保存", { timeout: 8000 });
 
     // Reload page
     await page.reload();

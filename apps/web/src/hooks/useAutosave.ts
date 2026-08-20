@@ -26,11 +26,22 @@ export function useAutosave({
   const latestContentRef = useRef(content);
   latestContentRef.current = content;
 
-  const latestRevisionRef = useRef(revision);
-  latestRevisionRef.current = revision;
+  const latestSavedContentRef = useRef<string | null>(content);
+  const savingContentRef = useRef<string | null>(null);
 
+  const latestRevisionRef = useRef(revision);
   const latestPathRef = useRef(path);
-  latestPathRef.current = path;
+
+  // Synchronize path and initial revision when note changes
+  const prevPathRef = useRef(path);
+
+  if (path !== prevPathRef.current) {
+    prevPathRef.current = path;
+    latestPathRef.current = path;
+    latestRevisionRef.current = revision;
+    latestSavedContentRef.current = content;
+    savingContentRef.current = null;
+  }
 
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
@@ -46,6 +57,11 @@ export function useAutosave({
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const performSave = useCallback(async (): Promise<boolean> => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
     const currentPath = latestPathRef.current;
     const currentRevision = latestRevisionRef.current;
 
@@ -68,6 +84,10 @@ export function useAutosave({
         while (shouldLoop) {
           shouldLoop = false;
           saveAgainRef.current = false;
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+          }
 
           const p = latestPathRef.current;
           const c = latestContentRef.current;
@@ -78,7 +98,11 @@ export function useAutosave({
             break;
           }
 
+          savingContentRef.current = c;
           const doc = await saveNote(p, c, r);
+          latestRevisionRef.current = doc.revision;
+          latestSavedContentRef.current = c;
+          savingContentRef.current = null;
           setStatus("saved");
           onSavedRef.current?.(doc);
 
@@ -89,6 +113,7 @@ export function useAutosave({
         return lastResult;
       } catch (err: unknown) {
         saveAgainRef.current = false;
+        savingContentRef.current = null;
 
         if (err instanceof ClientError && err.statusCode === 409) {
           setStatus("conflict");
@@ -109,7 +134,13 @@ export function useAutosave({
 
   // Debounced auto-save effect
   useEffect(() => {
-    if (!enabled || !path || revision === null) {
+    if (
+      !enabled ||
+      !path ||
+      revision === null ||
+      content === latestSavedContentRef.current ||
+      content === savingContentRef.current
+    ) {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
@@ -124,7 +155,12 @@ export function useAutosave({
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      performSave();
+      if (
+        latestContentRef.current !== latestSavedContentRef.current &&
+        latestContentRef.current !== savingContentRef.current
+      ) {
+        performSave();
+      }
     }, 1200);
 
     return () => {
@@ -152,8 +188,11 @@ export function useAutosave({
       debounceTimerRef.current = null;
     }
     saveAgainRef.current = false;
+    latestRevisionRef.current = latestRevisionRef.current ?? revision;
+    latestSavedContentRef.current = latestContentRef.current;
+    savingContentRef.current = null;
     setStatus(newStatus);
-  }, []);
+  }, [revision]);
 
   return {
     status,

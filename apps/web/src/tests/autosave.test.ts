@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAutosave } from "../hooks/useAutosave";
 import * as client from "../api/client";
@@ -19,28 +20,26 @@ vi.mock("../api/client", () => ({
 }));
 
 describe("useAutosave hook", () => {
-  it("does not auto-save when enabled is false (clean content)", async () => {
+  beforeEach(() => {
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not auto-save when enabled is false (clean content)", async () => {
     const saveNoteMock = vi.mocked(client.saveNote);
     const onSaved = vi.fn();
 
-    renderHook(
-      (props) =>
-        useAutosave({
-          path: props.path,
-          content: props.content,
-          revision: props.revision,
-          enabled: props.enabled,
-          onSaved,
-        }),
-      {
-        initialProps: {
-          path: "inbox/test.md",
-          content: "Content A",
-          revision: "rev-1",
-          enabled: false,
-        },
-      },
+    renderHook(() =>
+      useAutosave({
+        path: "inbox/test.md",
+        content: "Content A",
+        revision: "rev-1",
+        enabled: false,
+        onSaved,
+      }),
     );
 
     act(() => {
@@ -49,12 +48,11 @@ describe("useAutosave hook", () => {
 
     expect(saveNoteMock).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
   it("debounces 1200ms and calls saveNote once, and does not loop after onSaved updates", async () => {
-    vi.useFakeTimers();
     const saveNoteMock = vi.mocked(client.saveNote);
+    saveNoteMock.mockReset();
     saveNoteMock.mockResolvedValue({
       path: "inbox/test.md",
       content: "Content B",
@@ -63,48 +61,40 @@ describe("useAutosave hook", () => {
       size: 9,
     });
 
-    let currentOpenNote = {
-      path: "inbox/test.md",
-      content: "Content A",
-      revision: "rev-1",
-    };
-    let draftContent = "Content A";
+    const { result } = renderHook(() => {
+      const [openNote, setOpenNote] = useState({
+        path: "inbox/test.md",
+        content: "Content A",
+        revision: "rev-1",
+      });
+      const [draft, setDraft] = useState("Content A");
+      const isDirty = openNote.content !== draft;
 
-    const onSaved = vi.fn((doc) => {
-      currentOpenNote = {
-        path: doc.path,
-        content: doc.content,
-        revision: doc.revision,
-      };
+      const autosave = useAutosave({
+        path: openNote.path,
+        content: draft,
+        revision: openNote.revision,
+        enabled: isDirty,
+        onSaved: (doc) => {
+          setOpenNote({
+            path: doc.path,
+            content: doc.content,
+            revision: doc.revision,
+          });
+        },
+      });
+
+      return { autosave, setDraft };
     });
 
-    const { result, rerender } = renderHook(
-      (props) =>
-        useAutosave({
-          path: props.openNote.path,
-          content: props.draft,
-          revision: props.openNote.revision,
-          enabled: props.openNote.content !== props.draft,
-          onSaved,
-        }),
-      {
-        initialProps: {
-          openNote: currentOpenNote,
-          draft: draftContent,
-        },
-      },
-    );
-
-    expect(result.current.status).toBe("idle");
+    expect(result.current.autosave.status).toBe("idle");
 
     // User edits content to "Content B"
-    draftContent = "Content B";
-    rerender({
-      openNote: currentOpenNote,
-      draft: draftContent,
+    act(() => {
+      result.current.setDraft("Content B");
     });
 
-    expect(result.current.status).toBe("dirty");
+    expect(result.current.autosave.status).toBe("dirty");
 
     // Advance timer by 1200ms to trigger save
     await act(async () => {
@@ -117,13 +107,6 @@ describe("useAutosave hook", () => {
       "Content B",
       "rev-1",
     );
-    expect(onSaved).toHaveBeenCalledTimes(1);
-
-    // After save, onSaved updated currentOpenNote to Content B with rev-2
-    rerender({
-      openNote: currentOpenNote,
-      draft: draftContent,
-    });
 
     // Advance timer further into the future
     await act(async () => {
@@ -132,19 +115,18 @@ describe("useAutosave hook", () => {
 
     // Must NOT call saveNote again
     expect(saveNoteMock).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
   });
 
-  it("saveNow awaits in-flight save and handles sequential updates", async () => {
+  it("sequential saves use returned new revision for subsequent save", async () => {
+    let resolveFirstSave: (val: any) => void;
+    const firstSavePromise = new Promise((resolve) => {
+      resolveFirstSave = resolve;
+    });
+
     const saveNoteMock = vi.mocked(client.saveNote);
+    saveNoteMock.mockReset();
     saveNoteMock
-      .mockResolvedValueOnce({
-        path: "inbox/test.md",
-        content: "Content B",
-        revision: "rev-2",
-        modifiedAt: "2026-08-20T12:00:30.000Z",
-        size: 9,
-      })
+      .mockImplementationOnce(() => firstSavePromise as any)
       .mockResolvedValueOnce({
         path: "inbox/test.md",
         content: "Content C",
@@ -153,48 +135,76 @@ describe("useAutosave hook", () => {
         size: 9,
       });
 
-    let currentOpenNote = {
-      path: "inbox/test.md",
-      content: "Content A",
-      revision: "rev-1",
-    };
+    const { result } = renderHook(() => {
+      const [openNote, setOpenNote] = useState({
+        path: "inbox/test.md",
+        content: "Content A",
+        revision: "rev-1",
+      });
+      const [draft, setDraft] = useState("Content A");
+      const isDirty = openNote.content !== draft;
 
-    const onSaved = vi.fn((doc) => {
-      currentOpenNote = {
-        path: doc.path,
-        content: doc.content,
-        revision: doc.revision,
-      };
+      const autosave = useAutosave({
+        path: openNote.path,
+        content: draft,
+        revision: openNote.revision,
+        enabled: isDirty,
+        onSaved: (doc) => {
+          setOpenNote({
+            path: doc.path,
+            content: doc.content,
+            revision: doc.revision,
+          });
+        },
+      });
+
+      return { autosave, setDraft };
     });
 
-    const { result, rerender } = renderHook(
-      (props) =>
-        useAutosave({
-          path: props.openNote.path,
-          content: props.draft,
-          revision: props.openNote.revision,
-          enabled: props.openNote.content !== props.draft,
-          onSaved,
-        }),
-      {
-        initialProps: {
-          openNote: currentOpenNote,
-          draft: "Content B",
-        },
-      },
-    );
+    let savePromise: Promise<boolean>;
+    // 1. User changes draft to Content B and saveNow starts
+    act(() => {
+      result.current.setDraft("Content B");
+    });
+    act(() => {
+      savePromise = result.current.autosave.saveNow();
+    });
+
+    // 2. While in flight, user changes draft to Content C and saveNow is queued
+    act(() => {
+      result.current.setDraft("Content C");
+    });
+    act(() => {
+      result.current.autosave.saveNow();
+    });
+
+    // 3. Resolve first save
+    act(() => {
+      resolveFirstSave!({
+        path: "inbox/test.md",
+        content: "Content B",
+        revision: "rev-2",
+        modifiedAt: "2026-08-20T12:00:30.000Z",
+        size: 9,
+      });
+    });
 
     await act(async () => {
-      const p1 = result.current.saveNow();
-      rerender({
-        openNote: currentOpenNote,
-        draft: "Content C",
-      });
-      const p2 = result.current.saveNow();
-      await Promise.all([p1, p2]);
+      await savePromise;
     });
 
-    expect(saveNoteMock.mock.calls.length).toBeGreaterThanOrEqual(1);
-    expect(onSaved).toHaveBeenCalled();
+    expect(saveNoteMock).toHaveBeenCalledTimes(2);
+    expect(saveNoteMock).toHaveBeenNthCalledWith(
+      1,
+      "inbox/test.md",
+      "Content B",
+      "rev-1",
+    );
+    expect(saveNoteMock).toHaveBeenNthCalledWith(
+      2,
+      "inbox/test.md",
+      "Content C",
+      "rev-2",
+    );
   });
 });

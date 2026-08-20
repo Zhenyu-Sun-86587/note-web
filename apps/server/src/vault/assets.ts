@@ -49,6 +49,26 @@ export async function saveAsset(
   const year = now.getFullYear().toString();
   const month = (now.getMonth() + 1).toString().padStart(2, "0");
 
+  const attachmentsRoot = path.join(vaultRoot, "attachments");
+  let attachmentsExists = false;
+  try {
+    const stat = await fs.promises.lstat(attachmentsRoot);
+    attachmentsExists = true;
+    if (stat.isSymbolicLink()) {
+      await assertRealPathInsideVault(vaultRoot, attachmentsRoot, "existing");
+    }
+  } catch (err: any) {
+    if (err.code !== "ENOENT") throw err;
+  }
+
+  if (!attachmentsExists) {
+    await assertRealPathInsideVault(vaultRoot, vaultRoot, "existing");
+    await fs.promises.mkdir(attachmentsRoot);
+    await assertRealPathInsideVault(vaultRoot, attachmentsRoot, "existing");
+  } else {
+    await assertRealPathInsideVault(vaultRoot, attachmentsRoot, "existing");
+  }
+
   const targetDirRel = path.posix.join("attachments", year, month);
   const targetDirFull = path.join(vaultRoot, "attachments", year, month);
 

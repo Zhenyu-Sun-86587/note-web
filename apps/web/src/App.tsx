@@ -137,19 +137,27 @@ export default function App() {
     },
   });
 
+  // Flush helper that aborts if dirty save fails
+  const flushCurrentNote = useCallback(async (): Promise<boolean> => {
+    if (!isDirty) {
+      return true;
+    }
+    return saveNow();
+  }, [isDirty, saveNow]);
+
   // Switch note safely flushing dirty changes
   const switchNote = useCallback(
     async (targetPath: string) => {
       if (openNote?.path === targetPath) return;
 
-      if (isDirty) {
-        await saveNow();
+      if (!(await flushCurrentNote())) {
+        return;
       }
 
       resetStatus("idle");
       await handleOpenNote(targetPath);
     },
-    [openNote, isDirty, saveNow, resetStatus, handleOpenNote],
+    [openNote, flushCurrentNote, resetStatus, handleOpenNote],
   );
 
   // Folder expand toggle
@@ -232,8 +240,8 @@ export default function App() {
 
   // CRUD actions
   const handleCreateNote = async (fullPath: string) => {
-    if (isDirty) {
-      await saveNow();
+    if (!(await flushCurrentNote())) {
+      return;
     }
     const newDoc = await createNote(fullPath, "");
     await loadTree();
@@ -254,8 +262,8 @@ export default function App() {
 
   const handleRenameNote = async (newPath: string) => {
     if (!openNote) return;
-    if (isDirty) {
-      await saveNow();
+    if (!(await flushCurrentNote())) {
+      return;
     }
     await renameOrMoveNote(openNote.path, newPath);
     await loadTree();
@@ -264,8 +272,8 @@ export default function App() {
 
   const handleMoveNote = async (newPath: string) => {
     if (!openNote) return;
-    if (isDirty) {
-      await saveNow();
+    if (!(await flushCurrentNote())) {
+      return;
     }
     await renameOrMoveNote(openNote.path, newPath);
     await loadTree();
@@ -287,6 +295,11 @@ export default function App() {
     if (!deleteTarget) return;
 
     if (deleteTarget.type === "note") {
+      if (openNote?.path === deleteTarget.path) {
+        if (!(await flushCurrentNote())) {
+          return;
+        }
+      }
       await deleteNote(deleteTarget.path);
       if (openNote?.path === deleteTarget.path) {
         resetStatus("idle");
