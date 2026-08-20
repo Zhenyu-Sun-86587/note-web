@@ -319,6 +319,17 @@ export default function App() {
         setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
       }
     } else {
+      const affectsOpenNote =
+        openNote !== null &&
+        (openNote.path === renameTarget.path ||
+          openNote.path.startsWith(`${renameTarget.path}/`));
+
+      if (affectsOpenNote) {
+        if (!(await flushCurrentNote())) {
+          return;
+        }
+      }
+
       await renameFolder(renameTarget.path, newPath);
       // Remap openNote path if it is inside renamed folder
       if (
@@ -650,6 +661,7 @@ export default function App() {
             setRenameTarget(null);
           }}
           currentPath={renameTarget.path}
+          kind={renameTarget.type}
           onSubmit={handleRenameSubmit}
         />
       )}

@@ -40,6 +40,9 @@ export const Modal: React.FC<ModalProps> = ({
         style={{ maxWidth: width }}
         onClick={(e) => e.stopPropagation()}
         ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
         <div className="modal-header">
           <h3 className="modal-title">{title}</h3>

@@ -24,9 +24,19 @@ test.afterEach(() => {
   if (fs.existsSync(copyFile2)) {
     fs.unlinkSync(copyFile2);
   }
+  const renamedFolder = path.resolve(process.cwd(), "test-vault/renamed_projects");
+  if (fs.existsSync(renamedFolder)) {
+    // move back to projects if it was renamed
+    const origProjects = path.resolve(process.cwd(), "test-vault/projects");
+    if (!fs.existsSync(origProjects)) {
+      fs.renameSync(renamedFolder, origProjects);
+    } else {
+      fs.rmSync(renamedFolder, { recursive: true, force: true });
+    }
+  }
 });
 
-test.describe("Note Web E2E UX Pass 3 Suite", () => {
+test.describe("Note Web E2E UX Pass 3.1 Suite", () => {
   test("loads welcome.md, edits content, autosaves, and persists after reload", async ({
     page,
   }) => {
@@ -123,7 +133,7 @@ test.describe("Note Web E2E UX Pass 3 Suite", () => {
     expect(styleContent).toContain("--editor-font-size: 20px");
   });
 
-  test("renders Bold, Italic, Strike, and Inline Code live in Vditor IR without page reload (including adjacent Chinese characters)", async ({
+  test("renders Bold, Italic, Strike, and Inline Code live in Vditor IR without page reload (including selected, collapsed-caret, and adjacent Chinese)", async ({
     page,
   }) => {
     await page.goto("/");
@@ -148,8 +158,23 @@ test.describe("Note Web E2E UX Pass 3 Suite", () => {
     const italicEl = page.locator(".vditor-ir em");
     await expect(italicEl.filter({ hasText: "liveitalic" })).toBeVisible({ timeout: 5000 });
 
-    // Test C: Chinese adjacent bold text typing
+    // Test C: Collapsed caret + Ctrl+B in Chinese text
+    await page.keyboard.press("End");
     await page.keyboard.press("Enter");
+    await page.keyboard.type("神经网");
+    await page.keyboard.type("络不同层");
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("ArrowLeft");
+    }
+    await page.keyboard.press("Control+b");
+    await page.keyboard.type("细粒度");
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+
+    const collapsedBoldEl = page.locator(".vditor-ir strong");
+    await expect(collapsedBoldEl.filter({ hasText: "细粒度" })).toBeVisible({ timeout: 5000 });
+
+    // Test D: Manual Chinese adjacent bold text typing
     await page.keyboard.type("这是**中文加粗**测试");
     await page.keyboard.press("Enter");
     await page.keyboard.type("结束标记");
@@ -158,7 +183,7 @@ test.describe("Note Web E2E UX Pass 3 Suite", () => {
     await expect(chineseBoldEl.filter({ hasText: "中文加粗" })).toBeVisible({ timeout: 5000 });
   });
 
-  test("auto-pairs () [] {} with cursor placed between, supports selection wrap and skip closing", async ({
+  test("auto-pairs () [] {} with exact placement, skip-closing, and selection wrapping", async ({
     page,
   }) => {
     await page.goto("/");
@@ -169,22 +194,25 @@ test.describe("Note Web E2E UX Pass 3 Suite", () => {
     await page.keyboard.press("End");
     await page.keyboard.press("Enter");
 
-    // Type "(" -> ()
+    // Test A: Type ( then ) -> should skip close to ()
     await page.keyboard.press("(");
-    await page.keyboard.type("round");
-    await expect(editorContainer).toContainText("(round)");
+    await page.keyboard.press(")");
+    await page.keyboard.type("RoundText");
+    await expect(editorContainer).toContainText("()RoundText");
 
-    // Type "[" -> []
+    // Test B: Type [ then ] -> should skip close to []
     await page.keyboard.press("Enter");
     await page.keyboard.press("[");
-    await page.keyboard.type("square");
-    await expect(editorContainer).toContainText("[square]");
+    await page.keyboard.press("]");
+    await page.keyboard.type("SquareText");
+    await expect(editorContainer).toContainText("[]SquareText");
 
-    // Type "{" -> {}
+    // Test C: Type { then } -> should skip close to {}
     await page.keyboard.press("Enter");
     await page.keyboard.press("{");
-    await page.keyboard.type("curly");
-    await expect(editorContainer).toContainText("{curly}");
+    await page.keyboard.press("}");
+    await page.keyboard.type("CurlyText");
+    await expect(editorContainer).toContainText("{}CurlyText");
   });
 
   test("supports mouse drag resizing of sidebar and persists width across reload", async ({
@@ -261,5 +289,68 @@ test.describe("Note Web E2E UX Pass 3 Suite", () => {
     await expect(page.locator(".tree-note").filter({ hasText: "welcome" })).toHaveCount(2, {
       timeout: 5000,
     });
+  });
+
+  test("renames folder without appending .md and flushes dirty open note in descendant", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const editorContainer = page.locator(".vditor-ir .vditor-reset");
+    await expect(editorContainer).toBeVisible({ timeout: 10000 });
+
+    // Open note in projects folder
+    const exampleNote = page.locator(".tree-note").filter({ hasText: "example" }).first();
+    const isExampleVisible = await exampleNote.isVisible();
+    if (!isExampleVisible) {
+      const projectsFolder = page.locator(".tree-folder").filter({ hasText: "projects" }).first();
+      await projectsFolder.click();
+    }
+    await expect(exampleNote).toBeVisible();
+    await exampleNote.click();
+
+    // Edit content to make it dirty
+    const uniqueToken = `Flush-Token-${Date.now()}`;
+    await editorContainer.click();
+    await page.keyboard.type(`\n${uniqueToken}`);
+
+    // Right click projects folder to rename it
+    const projectsFolder = page.locator(".tree-folder").filter({ hasText: "projects" }).first();
+    await projectsFolder.click({ button: "right" });
+    const contextMenu = page.locator(".file-context-menu");
+    await expect(contextMenu).toBeVisible();
+
+    await contextMenu.getByRole("menuitem", { name: "重命名" }).click();
+
+    // Check Rename dialog title and input
+    const renameDialog = page.getByRole("dialog");
+    await expect(renameDialog).toBeVisible();
+    await expect(renameDialog.getByText("重命名目录")).toBeVisible();
+
+    const nameInput = renameDialog.locator('input[type="text"]');
+    await expect(nameInput).toHaveValue("projects");
+
+    // Change folder name to renamed_projects
+    await nameInput.fill("renamed_projects");
+    await renameDialog.getByRole("button", { name: "保存" }).click();
+    await expect(renameDialog).not.toBeVisible();
+
+    // Verify folder was renamed without .md
+    await expect(page.locator(".tree-folder").filter({ hasText: "renamed_projects" })).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.locator(".tree-folder").filter({ hasText: "renamed_projects.md" })).not.toBeVisible();
+
+    // Verify open note path in TopBar is now renamed_projects/example.md
+    const topBarPath = page.locator(".topbar-path");
+    await expect(topBarPath).toContainText("renamed_projects/example.md");
+
+    // Clean up folder rename back to projects
+    const renamedFolder = page.locator(".tree-folder").filter({ hasText: "renamed_projects" }).first();
+    await renamedFolder.click({ button: "right" });
+    await page.locator(".file-context-menu").getByRole("menuitem", { name: "重命名" }).click();
+    const revertDialog = page.getByRole("dialog");
+    await revertDialog.locator('input[type="text"]').fill("projects");
+    await revertDialog.getByRole("button", { name: "保存" }).click();
+    await expect(revertDialog).not.toBeVisible();
   });
 });

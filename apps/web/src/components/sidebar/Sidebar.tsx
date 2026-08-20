@@ -46,18 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   loading,
 }) => {
   return (
-    <div
-      className="sidebar"
-      onContextMenu={(e) => {
-        // If right clicked on empty area of sidebar
-        const target = e.target as HTMLElement;
-        if (target.closest(".tree-item") || target.closest(".tree-action-btn")) {
-          return;
-        }
-        e.preventDefault();
-        onContextMenu?.(e);
-      }}
-    >
+    <div className="sidebar">
       <div className="sidebar-header">
         <div className="sidebar-title">
           <span>Note Web</span>
@@ -97,7 +86,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      <div className="sidebar-content">
+      <div
+        className="sidebar-content"
+        onContextMenu={(e) => {
+          const target = e.target as HTMLElement;
+          if (
+            target.closest(".tree-item") ||
+            target.closest(".tree-action-btn")
+          ) {
+            return;
+          }
+          e.preventDefault();
+          onContextMenu?.(e);
+        }}
+      >
         <FileTree
           items={items}
           selectedPath={selectedPath}
