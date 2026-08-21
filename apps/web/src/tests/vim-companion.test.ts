@@ -72,7 +72,6 @@ describe("VimCompanionService and State Machine", () => {
     };
     window.addEventListener("message", activeHandler);
 
-    // Advance fake timers slightly or wait microtasks
     await vi.advanceTimersByTimeAsync(20);
 
     const result = await switchPromise;
@@ -83,6 +82,89 @@ describe("VimCompanionService and State Machine", () => {
 
     window.removeEventListener("message", activeHandler);
     unsubscribe();
+  });
+
+  it("P0-1 Fix: switchToCommandInput does NOT enter normal-ready if verified is false", async () => {
+    const service = VimCompanionService.getInstance();
+    service._mockSetAvailability("available");
+
+    const switchPromise = service.switchToCommandInput(500);
+    expect(service.getInputState()).toBe("normal-pending");
+
+    const activeHandler = (event: MessageEvent) => {
+      const data = event.data;
+      if (
+        data &&
+        data.source === "note-web" &&
+        data.channel === "vim-ime" &&
+        data.action === "switch_ascii"
+      ) {
+        window.postMessage(
+          {
+            source: "note-web-companion",
+            channel: "vim-ime",
+            id: data.id,
+            ok: false,
+            action: "switch_ascii",
+            strategy: "keyboard_layout",
+            verified: false,
+            code: "SWITCH_UNVERIFIED",
+          },
+          "*",
+        );
+      }
+    };
+    window.addEventListener("message", activeHandler);
+
+    await vi.advanceTimersByTimeAsync(20);
+
+    const result = await switchPromise;
+    expect(result.ok).toBe(false);
+    expect(result.verified).toBe(false);
+    expect(result.code).toBe("SWITCH_UNVERIFIED");
+    expect(service.getInputState()).toBe("error");
+
+    window.removeEventListener("message", activeHandler);
+  });
+
+  it("P0-3 Fix: handles native-state-invalidated event and revokes normal-ready", () => {
+    const service = VimCompanionService.getInstance();
+    service._mockSetAvailability("available");
+    service._mockSetInputState("normal-ready");
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          source: "note-web-companion",
+          channel: "vim-ime",
+          type: "native-state-invalidated",
+          reason: "page-hidden",
+        },
+      }),
+    );
+
+    expect(service.getInputState()).not.toBe("normal-ready");
+    expect(service.getInputState()).toBe("normal-pending");
+  });
+
+  it("P0-4 Fix: handles native-disconnected event and marks companion unavailable", () => {
+    const service = VimCompanionService.getInstance();
+    service._mockSetAvailability("available");
+    service._mockSetInputState("normal-ready");
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          source: "note-web-companion",
+          channel: "vim-ime",
+          type: "native-disconnected",
+          reason: "port-disconnected",
+        },
+      }),
+    );
+
+    expect(service.getAvailability()).toBe("unavailable");
+    expect(service.getInputState()).toBe("unavailable");
   });
 
   it("switchToCommandInput transitions to error on timeout and falls back safely", async () => {

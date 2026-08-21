@@ -34,14 +34,28 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Unconditionally initialize script directory and repository root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent $scriptDir
+
+# Sanitize and validate Extension ID
+$cleanExtensionId = $ExtensionId.Trim()
+if ($cleanExtensionId -match "^chrome-extension://([^/]+)") {
+    $cleanExtensionId = $Matches[1]
+}
+$cleanExtensionId = $cleanExtensionId.TrimEnd("/").Trim()
+
+if (-not ($cleanExtensionId -match "^[a-zA-Z0-9]{16,64}$")) {
+    Write-Error "Invalid ExtensionId format: '$ExtensionId'. Extension ID should be an alphanumeric string (e.g. 32 characters)."
+    exit 1
+}
+
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host " Note Web Vim IME Companion — Windows Host Installer" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
 # 1. Resolve Executable Path
 if ([string]::IsNullOrWhiteSpace($ExecutablePath)) {
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $repoRoot = Split-Path -Parent $scriptDir
     $ExecutablePath = Join-Path $repoRoot "companion\windows-host\target\release\note-web-ime.exe"
 }
 
@@ -75,7 +89,7 @@ Write-Host "[DEPLOYED] Native Host binary: $destExePath" -ForegroundColor Green
 
 # 3. Generate Native Messaging Host Manifest
 $manifestPath = Join-Path $installDir "com.noteweb.ime.json"
-$allowedOrigin = "chrome-extension://$ExtensionId/"
+$allowedOrigin = "chrome-extension://$cleanExtensionId/"
 
 $manifestObj = [ordered]@{
     name            = "com.noteweb.ime"

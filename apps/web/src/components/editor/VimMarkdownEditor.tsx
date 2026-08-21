@@ -278,6 +278,31 @@ export const VimMarkdownEditor = forwardRef<
 
       lastEmittedValueRef.current = value;
 
+      let wasDialogActive = false;
+
+      const syncVimDialogState = () => {
+        if (!viewRef.current) return;
+        const currentCm = getCM(viewRef.current);
+        const isDialog = isVimDialogActive(currentCm, viewRef.current);
+        const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+
+        if (!wasDialogActive && isDialog) {
+          wasDialogActive = true;
+          vimCompanion.restoreTextInput();
+        } else if (wasDialogActive && !isDialog) {
+          wasDialogActive = false;
+          if (!isInsertOrReplace) {
+            vimCompanion.switchToCommandInput();
+            proxyRef.current?.focus();
+            updateProxyPosition(
+              viewRef.current,
+              proxyRef.current,
+              containerRef.current,
+            );
+          }
+        }
+      };
+
       const updateListener = EditorView.updateListener.of((update) => {
         if (update.selectionSet || update.viewportChanged) {
           updateProxyPosition(
@@ -291,10 +316,7 @@ export const VimMarkdownEditor = forwardRef<
           lastEmittedValueRef.current = docString;
           onChangeRef.current(docString);
         }
-        const currentCm = getCM(update.view);
-        if (isVimDialogActive(currentCm, update.view)) {
-          vimCompanion.restoreTextInput();
-        }
+        syncVimDialogState();
       });
 
       // 1. Intercept Ctrl shortcuts and maintain proxy focus in NORMAL/VISUAL mode
@@ -507,13 +529,10 @@ export const VimMarkdownEditor = forwardRef<
       }
 
       const handleFocusIn = (e: FocusEvent) => {
+        syncVimDialogState();
         const currentCm = getCM(view);
         const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
-        if (isVimDialogActive(currentCm, view)) {
-          vimCompanion.restoreTextInput();
-          return;
-        }
-        if (!isInsertOrReplace) {
+        if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
           if (
             e.target === document.body ||
             e.target === view.dom ||
@@ -527,6 +546,30 @@ export const VimMarkdownEditor = forwardRef<
         }
       };
       document.addEventListener("focusin", handleFocusIn);
+
+      const handleFocusOut = () => {
+        queueMicrotask(syncVimDialogState);
+      };
+      document.addEventListener("focusout", handleFocusOut);
+
+      const panelObserver = new MutationObserver(() => {
+        syncVimDialogState();
+      });
+      panelObserver.observe(view.dom, { childList: true, subtree: true });
+
+      const handleVisibilityOrFocus = () => {
+        if (document.visibilityState === "visible") {
+          if (!viewRef.current) return;
+          const currentCm = getCM(viewRef.current);
+          const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+          const isDialog = isVimDialogActive(currentCm, viewRef.current);
+          if (!isInsertOrReplace && !isDialog) {
+            vimCompanion.switchToCommandInput();
+          }
+        }
+      };
+      document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.addEventListener("focus", handleVisibilityOrFocus);
 
       const handleWindowKeyDown = (e: KeyboardEvent) => {
         if (e.target === proxyRef.current) return;
@@ -562,6 +605,10 @@ export const VimMarkdownEditor = forwardRef<
         vimCompanion.restoreTextInput();
         window.removeEventListener("keydown", handleWindowKeyDown, true);
         document.removeEventListener("focusin", handleFocusIn);
+        document.removeEventListener("focusout", handleFocusOut);
+        document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+        window.removeEventListener("focus", handleVisibilityOrFocus);
+        panelObserver.disconnect();
         proxyCleanup?.();
         (cm as any)?.off?.("vim-mode-change", handleModeChange);
         (cm as any)?.off?.("vim-command-done", persistAfterVimCommand);

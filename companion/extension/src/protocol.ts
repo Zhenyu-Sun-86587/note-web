@@ -11,9 +11,9 @@ export interface VimCompanionBridgeRequest {
 export interface VimCompanionBridgeResponse {
   source: "note-web-companion";
   channel: "vim-ime";
-  id: string;
-  ok: boolean;
-  action: string;
+  id?: string;
+  ok?: boolean;
+  action?: string;
   strategy?: SwitchStrategy;
   verified?: boolean;
   targetPid?: number;
@@ -22,6 +22,8 @@ export interface VimCompanionBridgeResponse {
   message?: string;
   code?: string;
   restored?: boolean;
+  type?: "native-state-invalidated" | "native-disconnected";
+  reason?: string;
 }
 
 export interface NativeHostRequest {

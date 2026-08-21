@@ -46,8 +46,32 @@ window.addEventListener("message", (event: MessageEvent) => {
   });
 });
 
+// Forward background broadcast notifications to page context
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((msg: VimCompanionBridgeResponse) => {
+    if (
+      msg &&
+      msg.source === "note-web-companion" &&
+      msg.channel === "vim-ime"
+    ) {
+      window.postMessage(msg, "*");
+    }
+  });
+}
+
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
+    // P0-3: Invalidate normal-ready immediately in Web page context
+    window.postMessage(
+      {
+        source: "note-web-companion",
+        channel: "vim-ime",
+        type: "native-state-invalidated",
+        reason: "page-hidden",
+      },
+      "*",
+    );
+
     try {
       chrome.runtime?.sendMessage({
         source: "note-web",
@@ -62,6 +86,16 @@ document.addEventListener("visibilitychange", () => {
 });
 
 window.addEventListener("pagehide", () => {
+  window.postMessage(
+    {
+      source: "note-web-companion",
+      channel: "vim-ime",
+      type: "native-state-invalidated",
+      reason: "pagehide",
+    },
+    "*",
+  );
+
   try {
     chrome.runtime?.sendMessage({
       source: "note-web",

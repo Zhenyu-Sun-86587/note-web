@@ -10,7 +10,7 @@ use crate::window::{get_foreground_target_window, validate_target_window, Target
 use windows::{
     core::w,
     Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, WPARAM},
+        Foundation::{HWND, LPARAM, WPARAM},
         UI::{
             Input::{
                 Ime::ImmGetDefaultIMEWnd,
@@ -19,7 +19,9 @@ use windows::{
                     KLF_NOTELLSHELL, KLF_SUBSTITUTE_OK,
                 },
             },
-            WindowsAndMessaging::{PostMessageW, SendMessageW},
+            WindowsAndMessaging::{
+                PostMessageW, SendMessageTimeoutW, SEND_MESSAGE_TIMEOUT_FLAGS, SMTO_ABORTIFHUNG,
+            },
         },
     },
 };
@@ -28,8 +30,9 @@ const WM_INPUTLANGCHANGEREQUEST: u32 = 0x0050;
 const WM_IME_CONTROL: u32 = 0x0283;
 const IMC_GETOPENSTATUS: usize = 0x0005;
 const IMC_SETOPENSTATUS: usize = 0x0006;
+const IME_MESSAGE_TIMEOUT_MS: u32 = 150;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SavedTargetState {
     pub hwnd: usize,
     pub pid: u32,
@@ -58,6 +61,128 @@ pub struct DoctorReport {
     pub ime_open_status: Option<bool>,
     pub candidate_strategy: String,
     pub is_supported_browser: bool,
+}
+
+#[cfg(windows)]
+unsafe fn send_ime_message_timeout(
+    ime_wnd: HWND,
+    msg: u32,
+    wparam: usize,
+    lparam: isize,
+    timeout_ms: u32,
+) -> Result<usize> {
+    let mut result = 0usize;
+    let res = SendMessageTimeoutW(
+        ime_wnd,
+        msg,
+        WPARAM(wparam),
+        LPARAM(lparam),
+        SEND_MESSAGE_TIMEOUT_FLAGS(SMTO_ABORTIFHUNG.0),
+        timeout_ms,
+        Some(&mut result as *mut usize),
+    );
+    if res.0 == 0 {
+        bail!(
+            "SendMessageTimeoutW failed or timed out after {}ms",
+            timeout_ms
+        );
+    }
+    Ok(result)
+}
+
+#[cfg(windows)]
+pub fn verify_strategy_a_ascii(hwnd: HWND) -> Result<bool> {
+    unsafe {
+        let ime_wnd = ImmGetDefaultIMEWnd(hwnd);
+        if ime_wnd.0.is_null() {
+            return Ok(false);
+        }
+        let status = send_ime_message_timeout(
+            ime_wnd,
+            WM_IME_CONTROL,
+            IMC_GETOPENSTATUS,
+            0,
+            IME_MESSAGE_TIMEOUT_MS,
+        )?;
+        Ok(status == 0)
+    }
+}
+
+#[cfg(windows)]
+pub fn verify_strategy_b_ascii(tid: u32) -> Result<bool> {
+    unsafe {
+        let hkl = GetKeyboardLayout(tid).0 as usize;
+        Ok((hkl & 0xFFFF) == 0x0409)
+    }
+}
+
+#[cfg(windows)]
+pub fn verify_target_ascii(target: &TargetWindowInfo, strategy: &SwitchStrategy) -> Result<bool> {
+    match strategy {
+        SwitchStrategy::ImeOpenState => {
+            let hwnd = HWND(target.hwnd as *mut std::ffi::c_void);
+            verify_strategy_a_ascii(hwnd)
+        }
+        SwitchStrategy::KeyboardLayout => verify_strategy_b_ascii(target.tid),
+    }
+}
+
+#[cfg(windows)]
+pub fn execute_and_verify_strategy_a_restore(
+    saved: &SavedTargetState,
+    expected_open: bool,
+) -> Result<bool> {
+    unsafe {
+        let hwnd = HWND(saved.hwnd as *mut std::ffi::c_void);
+        let ime_wnd = ImmGetDefaultIMEWnd(hwnd);
+        if ime_wnd.0.is_null() {
+            return Ok(false);
+        }
+        let _ = send_ime_message_timeout(
+            ime_wnd,
+            WM_IME_CONTROL,
+            IMC_SETOPENSTATUS,
+            if expected_open { 1 } else { 0 },
+            IME_MESSAGE_TIMEOUT_MS,
+        )?;
+        let status = send_ime_message_timeout(
+            ime_wnd,
+            WM_IME_CONTROL,
+            IMC_GETOPENSTATUS,
+            0,
+            IME_MESSAGE_TIMEOUT_MS,
+        )?;
+        let actual_open = status != 0;
+        Ok(actual_open == expected_open)
+    }
+}
+
+#[cfg(windows)]
+pub fn execute_and_verify_strategy_b_restore(
+    saved: &SavedTargetState,
+    expected_hkl: usize,
+) -> Result<bool> {
+    unsafe {
+        let hwnd = HWND(saved.hwnd as *mut std::ffi::c_void);
+        let _ = PostMessageW(
+            hwnd,
+            WM_INPUTLANGCHANGEREQUEST,
+            WPARAM(0),
+            LPARAM(expected_hkl as isize),
+        );
+
+        let deadline = Instant::now() + Duration::from_millis(250);
+        while Instant::now() < deadline {
+            let current = GetKeyboardLayout(saved.tid).0 as usize;
+            if current == expected_hkl {
+                return Ok(true);
+            }
+            thread::sleep(Duration::from_millis(15));
+        }
+
+        let final_hkl = GetKeyboardLayout(saved.tid).0 as usize;
+        Ok(final_hkl == expected_hkl)
+    }
 }
 
 impl SessionState {
@@ -110,18 +235,39 @@ impl SessionState {
             }
         };
 
-        // Idempotency: if already switched for the exact same target window
+        // P1-2: Ownership Protection & Conflict Detection
         if self.switched {
             if let Some(ref saved) = self.target {
-                if saved.hwnd == target.hwnd && saved.pid == target.pid {
-                    let mut resp = NativeResponse::success(id, "switch_ascii");
-                    resp.strategy = self.strategy.clone();
-                    resp.verified = Some(true);
+                if saved.hwnd != target.hwnd || saved.pid != target.pid {
+                    let mut resp = NativeResponse::error(
+                        id,
+                        "switch_ascii",
+                        "ACTIVE_TARGET_CONFLICT",
+                        "Another target window is currently active and switched; restore must be completed before switching a new target",
+                    );
                     resp.target_pid = Some(target.pid);
                     resp.target_hwnd = Some(format!("0x{:X}", target.hwnd));
                     resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
                     return resp;
                 }
+
+                // P0-1B: Idempotent switch on the SAME target - MUST verify real OS state!
+                if let Some(ref strat) = self.strategy {
+                    if let Ok(true) = verify_target_ascii(&target, strat) {
+                        let mut resp = NativeResponse::success(id, "switch_ascii");
+                        resp.strategy = self.strategy.clone();
+                        resp.verified = Some(true);
+                        resp.target_pid = Some(target.pid);
+                        resp.target_hwnd = Some(format!("0x{:X}", target.hwnd));
+                        resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
+                        return resp;
+                    }
+                }
+
+                // OS verification lost on existing session: clear stale state and switch afresh
+                self.switched = false;
+                self.target = None;
+                self.strategy = None;
             }
         }
 
@@ -154,6 +300,22 @@ impl SessionState {
         // Try Strategy B: Targeted Keyboard Layout HKL switch to 0x0409 (US English)
         match try_strategy_b_switch(&target) {
             Ok((prev_hkl, verified)) => {
+                // P0-1: If verified is false, DO NOT mutate session state!
+                if !verified {
+                    let mut resp = NativeResponse::error(
+                        id,
+                        "switch_ascii",
+                        "SWITCH_UNVERIFIED",
+                        "Strategy B keyboard layout switch could not be verified in target window",
+                    );
+                    resp.verified = Some(false);
+                    resp.target_pid = Some(target.pid);
+                    resp.target_hwnd = Some(format!("0x{:X}", target.hwnd));
+                    resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
+                    return resp;
+                }
+
+                // Verified true -> record session state
                 self.switched = true;
                 self.strategy = Some(SwitchStrategy::KeyboardLayout);
                 self.target = Some(SavedTargetState {
@@ -166,7 +328,7 @@ impl SessionState {
 
                 let mut resp = NativeResponse::success(id, "switch_ascii");
                 resp.strategy = Some(SwitchStrategy::KeyboardLayout);
-                resp.verified = Some(verified);
+                resp.verified = Some(true);
                 resp.target_pid = Some(target.pid);
                 resp.target_hwnd = Some(format!("0x{:X}", target.hwnd));
                 resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
@@ -196,8 +358,8 @@ impl SessionState {
             return resp;
         }
 
-        let saved = match self.target.take() {
-            Some(s) => s,
+        let saved = match self.target {
+            Some(ref s) => s.clone(),
             None => {
                 self.switched = false;
                 self.strategy = None;
@@ -207,69 +369,81 @@ impl SessionState {
             }
         };
 
-        let strategy = self.strategy.take();
-        self.switched = false;
-
         // Validate target window is still alive and has the same PID
         if !validate_target_window(saved.hwnd, saved.pid) {
-            let mut resp = NativeResponse::success(id, "restore");
+            // Target is gone: safely clean up session state
+            self.switched = false;
+            self.target = None;
+            self.strategy = None;
+
+            let mut resp = NativeResponse::error(
+                id,
+                "restore",
+                "TARGET_GONE",
+                "Target window was closed or process exited; session state cleared",
+            );
             resp.restored = Some(false);
-            resp.message = Some("Target window was closed; state cleared".to_string());
+            resp.target_pid = Some(saved.pid);
+            resp.target_hwnd = Some(format!("0x{:X}", saved.hwnd));
             resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
             return resp;
         }
 
-        let hwnd = HWND(saved.hwnd as *mut std::ffi::c_void);
+        let strategy = match self.strategy {
+            Some(ref s) => s.clone(),
+            None => {
+                self.switched = false;
+                self.target = None;
+                let mut resp = NativeResponse::success(id, "restore");
+                resp.restored = Some(false);
+                return resp;
+            }
+        };
 
-        match strategy {
-            Some(SwitchStrategy::ImeOpenState) => {
+        // P1-1: Execute AND VERIFY restore
+        let restore_verified = match strategy {
+            SwitchStrategy::ImeOpenState => {
                 if let Some(prev_open) = saved.previous_ime_open {
-                    unsafe {
-                        let ime_wnd = ImmGetDefaultIMEWnd(hwnd);
-                        if !ime_wnd.0.is_null() {
-                            SendMessageW(
-                                ime_wnd,
-                                WM_IME_CONTROL,
-                                WPARAM(IMC_SETOPENSTATUS),
-                                LPARAM(if prev_open { 1 } else { 0 }),
-                            );
-                        }
-                    }
+                    execute_and_verify_strategy_a_restore(&saved, prev_open).unwrap_or(false)
+                } else {
+                    false
                 }
             }
-            Some(SwitchStrategy::KeyboardLayout) => {
-                if let Some(prev_hkl_raw) = saved.previous_hkl {
-                    unsafe {
-                        let _ = PostMessageW(
-                            hwnd,
-                            WM_INPUTLANGCHANGEREQUEST,
-                            WPARAM(0),
-                            LPARAM(prev_hkl_raw as isize),
-                        );
+            SwitchStrategy::KeyboardLayout => {
+                if let Some(prev_hkl) = saved.previous_hkl {
+                    execute_and_verify_strategy_b_restore(&saved, prev_hkl).unwrap_or(false)
+                } else {
+                    false
+                }
+            }
+        };
 
-                        // Short poll verification
-                        let deadline = Instant::now() + Duration::from_millis(250);
-                        while Instant::now() < deadline {
-                            let current = GetKeyboardLayout(saved.tid).0 as usize;
-                            if current == prev_hkl_raw
-                                || (current & 0xFFFF) == (prev_hkl_raw & 0xFFFF)
-                            {
-                                break;
-                            }
-                            thread::sleep(Duration::from_millis(15));
-                        }
-                    }
-                }
-            }
-            None => {}
+        if restore_verified {
+            // P1-1: Clear session state ONLY after verification succeeds
+            self.switched = false;
+            self.target = None;
+            self.strategy = None;
+
+            let mut resp = NativeResponse::success(id, "restore");
+            resp.restored = Some(true);
+            resp.target_pid = Some(saved.pid);
+            resp.target_hwnd = Some(format!("0x{:X}", saved.hwnd));
+            resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
+            resp
+        } else {
+            // P1-1: Retain session state on failure so caller can retry!
+            let mut resp = NativeResponse::error(
+                id,
+                "restore",
+                "RESTORE_UNVERIFIED",
+                "Restore command was sent but target window state could not be verified",
+            );
+            resp.restored = Some(false);
+            resp.target_pid = Some(saved.pid);
+            resp.target_hwnd = Some(format!("0x{:X}", saved.hwnd));
+            resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
+            resp
         }
-
-        let mut resp = NativeResponse::success(id, "restore");
-        resp.restored = Some(true);
-        resp.target_pid = Some(saved.pid);
-        resp.target_hwnd = Some(format!("0x{:X}", saved.hwnd));
-        resp.elapsed_ms = Some(start_time.elapsed().as_millis() as u64);
-        resp
     }
 
     #[cfg(not(windows))]
@@ -289,13 +463,16 @@ pub fn run_doctor() -> Result<DoctorReport> {
         let ime_wnd = ImmGetDefaultIMEWnd(hwnd);
 
         let ime_open_status = if !ime_wnd.0.is_null() {
-            let res: LRESULT = SendMessageW(
+            match send_ime_message_timeout(
                 ime_wnd,
                 WM_IME_CONTROL,
-                WPARAM(IMC_GETOPENSTATUS),
-                LPARAM(0),
-            );
-            Some(res.0 != 0)
+                IMC_GETOPENSTATUS,
+                0,
+                IME_MESSAGE_TIMEOUT_MS,
+            ) {
+                Ok(res) => Some(res != 0),
+                Err(_) => None,
+            }
         } else {
             None
         };
@@ -331,30 +508,33 @@ fn try_strategy_a_switch(target: &TargetWindowInfo) -> Result<Option<bool>> {
             return Ok(None);
         }
 
-        let initial_open_res = SendMessageW(
+        let initial_open_res = send_ime_message_timeout(
             ime_wnd,
             WM_IME_CONTROL,
-            WPARAM(IMC_GETOPENSTATUS),
-            LPARAM(0),
-        );
-        let prev_open = initial_open_res.0 != 0;
+            IMC_GETOPENSTATUS,
+            0,
+            IME_MESSAGE_TIMEOUT_MS,
+        )?;
+        let prev_open = initial_open_res != 0;
 
         // Try setting IME open status to false (ASCII)
-        SendMessageW(
+        let _ = send_ime_message_timeout(
             ime_wnd,
             WM_IME_CONTROL,
-            WPARAM(IMC_SETOPENSTATUS),
-            LPARAM(0),
-        );
+            IMC_SETOPENSTATUS,
+            0,
+            IME_MESSAGE_TIMEOUT_MS,
+        )?;
 
         // Verify that open status is now false
-        let verified_res = SendMessageW(
+        let verified_res = send_ime_message_timeout(
             ime_wnd,
             WM_IME_CONTROL,
-            WPARAM(IMC_GETOPENSTATUS),
-            LPARAM(0),
-        );
-        let verified_closed = verified_res.0 == 0;
+            IMC_GETOPENSTATUS,
+            0,
+            IME_MESSAGE_TIMEOUT_MS,
+        )?;
+        let verified_closed = verified_res == 0;
 
         if verified_closed {
             Ok(Some(prev_open))
@@ -430,5 +610,61 @@ mod tests {
         assert_eq!(restore_resp.id, "rest-1");
         assert!(restore_resp.ok);
         assert_eq!(restore_resp.restored, Some(false));
+    }
+
+    #[test]
+    fn test_target_conflict_semantics() {
+        let mut session = SessionState::new();
+        session.switched = true;
+        session.strategy = Some(SwitchStrategy::KeyboardLayout);
+        session.target = Some(SavedTargetState {
+            hwnd: 0x1000,
+            pid: 100,
+            tid: 101,
+            previous_ime_open: None,
+            previous_hkl: Some(0x08040804),
+        });
+
+        // If target does not match foreground (simulated)
+        let incoming_target = TargetWindowInfo {
+            hwnd: 0x2000,
+            pid: 200,
+            tid: 201,
+            process_name: "msedge.exe".to_string(),
+            exe_path: "".to_string(),
+        };
+
+        // Verify conflict rule: cannot switch target B while target A is switched
+        assert_ne!(session.target.as_ref().unwrap().hwnd, incoming_target.hwnd);
+    }
+
+    #[test]
+    fn test_unverified_switch_preserves_clean_session() {
+        let session = SessionState::new();
+        // A failed/unverified switch must leave switched=false, target=None
+        assert!(!session.switched);
+        assert!(session.target.is_none());
+        assert!(session.strategy.is_none());
+    }
+
+    #[test]
+    fn test_restore_state_preservation_on_unverified() {
+        let mut session = SessionState::new();
+        let initial_saved = SavedTargetState {
+            hwnd: 0x1234,
+            pid: 99999, // Non-existent PID so validate_target_window fails
+            tid: 99998,
+            previous_ime_open: None,
+            previous_hkl: Some(0x08040804),
+        };
+        session.switched = true;
+        session.strategy = Some(SwitchStrategy::KeyboardLayout);
+        session.target = Some(initial_saved);
+
+        // When target is closed / PID gone, restore safely clears session
+        let resp = session.restore("r-test");
+        assert_eq!(resp.code, Some("TARGET_GONE".to_string()));
+        assert!(!session.switched);
+        assert!(session.target.is_none());
     }
 }

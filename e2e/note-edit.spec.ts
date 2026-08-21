@@ -1927,9 +1927,15 @@ test.describe("Note Web E2E Suite", () => {
     await vimBtn.click();
 
     const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const imeStatus = page.locator(".note-web-vim-ime-status");
     await expect(cmContent).toBeVisible();
+    await expect(imeStatus).toContainText("IME Auto");
+
     await cmContent.click();
     await page.keyboard.press("Escape");
+
+    // Clear recorded calls prior to opening search
+    await page.evaluate(() => ((window as any).__mockCalls = []));
 
     // Press '/' to open Search dialog
     await page.keyboard.press("/");
@@ -1938,6 +1944,12 @@ test.describe("Note Web E2E Suite", () => {
     const dialogInput = page.locator(".cm-vim-panel input, .cm-panel input");
     await expect(dialogInput).toBeVisible({ timeout: 5000 });
 
+    // Verify restore was requested when dialog opened
+    await expect.poll(async () => {
+      const calls = await page.evaluate(() => (window as any).__mockCalls || []);
+      return calls.some((c: any) => c.action === "restore");
+    }).toBe(true);
+
     // Type Unicode Chinese search term
     await dialogInput.fill("欢迎使用");
     await page.keyboard.press("Enter");
@@ -1945,10 +1957,106 @@ test.describe("Note Web E2E Suite", () => {
     // After pressing Enter, dialog closes and editor returns to Normal
     await expect(dialogInput).not.toBeVisible();
 
-    // Verify restore was requested when dialog opened
-    const calls = await page.evaluate(() => (window as any).__mockCalls || []);
-    const restoreCalls = calls.filter((c: any) => c.action === "restore");
-    expect(restoreCalls.length).toBeGreaterThanOrEqual(1);
+    // Verify switch_ascii was requested upon search closing and state returns to normal-ready
+    await expect.poll(async () => {
+      const calls = await page.evaluate(() => (window as any).__mockCalls || []);
+      const actions = calls.map((c: any) => c.action);
+      return actions.includes("switch_ascii");
+    }).toBe(true);
+
+    await expect(imeStatus).toContainText("IME Auto");
+  });
+
+  test("Vim IME Companion E2E: Ex command : restores text input and closing via Escape re-switches to ASCII", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (window as any).__mockCalls = [];
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data && data.source === "note-web" && data.channel === "vim-ime") {
+          (window as any).__mockCalls.push(data);
+          if (data.action === "ping") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "ping",
+              },
+              "*",
+            );
+          } else if (data.action === "switch_ascii") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "switch_ascii",
+                strategy: "keyboard_layout",
+                verified: true,
+              },
+              "*",
+            );
+          } else if (data.action === "restore") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "restore",
+                restored: true,
+              },
+              "*",
+            );
+          }
+        }
+      });
+    });
+
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const imeStatus = page.locator(".note-web-vim-ime-status");
+    await expect(cmContent).toBeVisible();
+    await expect(imeStatus).toContainText("IME Auto");
+
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+
+    // Clear calls
+    await page.evaluate(() => ((window as any).__mockCalls = []));
+
+    // Press ':' to open Ex command panel
+    await page.keyboard.press(":");
+
+    const dialogInput = page.locator(".cm-vim-panel input, .cm-panel input");
+    await expect(dialogInput).toBeVisible({ timeout: 5000 });
+
+    // Verify restore was called when Ex opened
+    await expect.poll(async () => {
+      const calls = await page.evaluate(() => (window as any).__mockCalls || []);
+      return calls.some((c: any) => c.action === "restore");
+    }).toBe(true);
+
+    // Cancel Ex dialog with Escape
+    await page.keyboard.press("Escape");
+    await expect(dialogInput).not.toBeVisible();
+
+    // Verify switch_ascii re-acquired
+    await expect.poll(async () => {
+      const calls = await page.evaluate(() => (window as any).__mockCalls || []);
+      return calls.some((c: any) => c.action === "switch_ascii");
+    }).toBe(true);
+
+    await expect(imeStatus).toContainText("IME Auto");
   });
 
   test("Vim IME Companion E2E: Switching from Vim to IR restores text input for rich text editing", async ({

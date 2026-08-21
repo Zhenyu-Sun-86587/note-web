@@ -73,8 +73,24 @@ function getOrCreateNativePort(): chrome.runtime.Port | null {
         });
       }
       pendingRequests.clear();
+
+      const oldOwnerTabId = ownerTabId;
       nativePort = null;
       ownerTabId = null;
+
+      // P0-4: Notify current owner page that native port disconnected
+      if (oldOwnerTabId !== null && typeof chrome.tabs !== "undefined") {
+        try {
+          chrome.tabs.sendMessage(oldOwnerTabId, {
+            source: "note-web-companion",
+            channel: "vim-ime",
+            type: "native-disconnected",
+            reason: "port-disconnected",
+          });
+        } catch {
+          // Tab may already be closed
+        }
+      }
     });
 
     nativePort = port;
@@ -151,27 +167,109 @@ chrome.runtime.onMessage.addListener(
       return false;
     }
 
-    const senderTabId = sender.tab?.id ?? null;
+    const senderTab = sender.tab;
+    const senderTabId = senderTab?.id ?? null;
 
-    // Handle tab ownership transfer for switch_ascii
-    if (message.action === "switch_ascii" && senderTabId !== null) {
-      if (ownerTabId !== null && ownerTabId !== senderTabId) {
-        // Restore previous owner before transferring ownership
-        sendToNativeHost({
-          id: `transfer-restore-${Date.now()}`,
-          action: "restore",
-        }).then(() => {
-          ownerTabId = senderTabId;
+    // Handle switch_ascii requests
+    if (message.action === "switch_ascii") {
+      // P1-3: Verify sender tab exists and is active
+      if (!senderTab || senderTabId === null) {
+        sendResponse({
+          source: "note-web-companion",
+          channel: "vim-ime",
+          id: message.id,
+          ok: false,
+          action: message.action,
+          code: "TAB_NOT_FOUND",
+          message: "Switch request ignored because sender has no associated tab",
+        });
+        return false;
+      }
+
+      if (!senderTab.active) {
+        sendResponse({
+          source: "note-web-companion",
+          channel: "vim-ime",
+          id: message.id,
+          ok: false,
+          action: message.action,
+          code: "TAB_NOT_ACTIVE",
+          message: "Switch request ignored because sender tab is not active",
+        });
+        return false;
+      }
+
+      // Check window focus if windows API is available
+      const proceedWithSwitch = () => {
+        // P1-2: Ownership Transfer with verification
+        if (ownerTabId !== null && ownerTabId !== senderTabId) {
           sendToNativeHost({
-            id: message.id,
-            action: message.action,
-          }).then((resp) => {
-            sendResponse(resp);
+            id: `transfer-restore-${Date.now()}`,
+            action: "restore",
+          }).then((restoreResp) => {
+            if (restoreResp.ok && restoreResp.restored !== false) {
+              // Notify previous owner that its command state is invalidated
+              try {
+                chrome.tabs.sendMessage(ownerTabId!, {
+                  source: "note-web-companion",
+                  channel: "vim-ime",
+                  type: "native-state-invalidated",
+                  reason: "owner-transferred",
+                });
+              } catch {}
+
+              ownerTabId = senderTabId;
+              sendToNativeHost({
+                id: message.id,
+                action: message.action,
+              }).then((resp) => {
+                sendResponse(resp);
+              });
+            } else {
+              sendResponse({
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: message.id,
+                ok: false,
+                action: message.action,
+                code: "OWNER_RESTORE_FAILED",
+                message: "Failed to restore previous owner tab IME state before switching",
+              });
+            }
           });
+          return;
+        }
+
+        ownerTabId = senderTabId;
+        sendToNativeHost({
+          id: message.id,
+          action: message.action,
+        }).then((resp) => {
+          sendResponse(resp);
+        });
+      };
+
+      if (typeof chrome.windows !== "undefined" && typeof senderTab.windowId === "number") {
+        chrome.windows.get(senderTab.windowId, (win) => {
+          if (chrome.runtime.lastError || !win || win.focused === false) {
+            sendResponse({
+              source: "note-web-companion",
+              channel: "vim-ime",
+              id: message.id,
+              ok: false,
+              action: message.action,
+              code: "WINDOW_NOT_FOCUSED",
+              message: "Switch request ignored because browser window is not focused",
+            });
+            return;
+          }
+          proceedWithSwitch();
         });
         return true;
       }
-      ownerTabId = senderTabId;
+
+      proceedWithSwitch();
+      return true;
     }
 
     if (message.action === "restore" && senderTabId !== null) {

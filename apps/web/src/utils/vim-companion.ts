@@ -64,9 +64,24 @@ export class VimCompanionService {
       if (
         !data ||
         data.source !== "note-web-companion" ||
-        data.channel !== "vim-ime" ||
-        typeof data.id !== "string"
+        data.channel !== "vim-ime"
       ) {
+        return;
+      }
+
+      // Handle unsolicited native state invalidations / disconnections
+      if (data.type === "native-state-invalidated" || data.type === "native-disconnected") {
+        if (data.type === "native-disconnected") {
+          this.availability = "unavailable";
+          this.inputState = "unavailable";
+        } else if (this.inputState === "normal-ready") {
+          this.inputState = "normal-pending";
+        }
+        this.notify();
+        return;
+      }
+
+      if (typeof data.id !== "string") {
         return;
       }
 
@@ -78,6 +93,13 @@ export class VimCompanionService {
       }
     };
     window.addEventListener("message", this.messageHandler);
+  }
+
+  public invalidateNativeState(_reason?: string) {
+    if (this.inputState === "normal-ready") {
+      this.inputState = "normal-pending";
+      this.notify();
+    }
   }
 
   public async checkAvailability(timeoutMs = 400): Promise<boolean> {
@@ -173,13 +195,13 @@ export class VimCompanionService {
         timeoutMs,
       );
 
-      if (resp && resp.ok && resp.verified) {
+      if (resp && resp.ok && resp.verified === true) {
         this.inputState = "normal-ready";
         this.notify();
         return {
           ok: true,
           strategy: resp.strategy,
-          verified: resp.verified,
+          verified: true,
         };
       }
 
@@ -187,6 +209,7 @@ export class VimCompanionService {
       this.notify();
       return {
         ok: false,
+        verified: false,
         code: resp?.code || "SWITCH_UNVERIFIED",
         message: resp?.message || "Input switch could not be verified",
       };
@@ -195,6 +218,7 @@ export class VimCompanionService {
       this.notify();
       return {
         ok: false,
+        verified: false,
         code: "TIMEOUT",
         message: err?.message || "Companion request timed out",
       };
