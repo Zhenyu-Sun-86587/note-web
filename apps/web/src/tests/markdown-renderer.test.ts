@@ -106,4 +106,47 @@ describe("Markdown Renderer for Vim Preview", () => {
     const html = renderMarkdown("   ", "inbox/note.md");
     expect(html).toContain("无内容");
   });
+
+  it("correctly resolves vim/tmp orca-paste images without corruption from underscores", () => {
+    const md = "![orca-paste-1787334465553-00f21410-bcc9-459b-aed8-dab32b8ccb4b.png](vim/tmp/orca-paste-1787334465553-00f21410-bcc9-459b-aed8-dab32b8ccb4b.png)";
+    const html = renderMarkdown(md, "test.md");
+    expect(html).toContain(
+      '<img src="/api/raw/vim/tmp/orca-paste-1787334465553-00f21410-bcc9-459b-aed8-dab32b8ccb4b.png" alt="orca-paste-1787334465553-00f21410-bcc9-459b-aed8-dab32b8ccb4b.png" loading="lazy" />',
+    );
+    expect(html).not.toContain("<em>");
+  });
+
+  it("preserves image URLs with multiple underscores alongside italic and bold text", () => {
+    const md = "_italic_ ![Snipaste_2026-08-20_23-05-54.png](../attachments/2026/08/1787238353952-Snipaste_2026-08-20_23-05-54.png) **bold_text**";
+    const html = renderMarkdown(md, "保研复习/Paper.md");
+    expect(html).toContain("<em>italic</em>");
+    expect(html).toContain("<strong>bold_text</strong>");
+    expect(html).toContain(
+      '<img src="/api/raw/attachments/2026/08/1787238353952-Snipaste_2026-08-20_23-05-54.png" alt="Snipaste_2026-08-20_23-05-54.png" loading="lazy" />',
+    );
+  });
+
+  it("handles image titles and angle bracket formatting", () => {
+    const md = '![Alt Text](<vim/tmp/orca-paste.png> "Custom Image Title")';
+    const html = renderMarkdown(md, "test.md");
+    expect(html).toContain(
+      '<img src="/api/raw/vim/tmp/orca-paste.png" alt="Alt Text" title="Custom Image Title" loading="lazy" />',
+    );
+  });
+
+  it("renders raw HTML img tags with resolved relative src", () => {
+    const md = '<img src="vim/tmp/orca-paste-1787334465553-00f21410-bcc9-459b-aed8-dab32b8ccb4b.png" alt="Screenshot" width="400" />';
+    const html = renderMarkdown(md, "test.md");
+    expect(html).toContain(
+      '<img src="/api/raw/vim/tmp/orca-paste-1787334465553-00f21410-bcc9-459b-aed8-dab32b8ccb4b.png" alt="Screenshot" width="400" loading="lazy" />',
+    );
+  });
+
+  it("renders link-wrapped images properly", () => {
+    const md = "[![Screenshot](vim/tmp/orca-paste.png)](https://example.com)";
+    const html = renderMarkdown(md, "test.md");
+    expect(html).toContain(
+      '<a href="https://example.com" target="_blank" rel="noopener noreferrer"><img src="/api/raw/vim/tmp/orca-paste.png" alt="Screenshot" loading="lazy" /></a>',
+    );
+  });
 });

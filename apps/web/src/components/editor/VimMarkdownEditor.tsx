@@ -62,9 +62,11 @@ import {
   vimCompanion,
   type VimNativeInputState,
 } from "../../utils/vim-companion";
+import { uploadAsset } from "../../api/client";
 import "../../styles/vim-editor.css";
 
 export interface VimMarkdownEditorProps {
+  notePath?: string;
   value: string;
   onChange: (value: string) => void;
   onSave?: () => void;
@@ -157,6 +159,7 @@ export const VimMarkdownEditor = forwardRef<
 >(
   (
     {
+      notePath,
       value,
       onChange,
       onSave,
@@ -173,6 +176,8 @@ export const VimMarkdownEditor = forwardRef<
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const lastEmittedValueRef = useRef(value);
+    const notePathRef = useRef(notePath);
+    notePathRef.current = notePath;
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
     const onSaveRef = useRef(onSave);
@@ -476,6 +481,87 @@ export const VimMarkdownEditor = forwardRef<
             }
 
             return false;
+          },
+          paste: (e, view) => {
+            const files = e.clipboardData?.files;
+            if (!files || files.length === 0) return false;
+
+            const imageFiles: File[] = [];
+            for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              if (file.type.startsWith("image/")) {
+                imageFiles.push(file);
+              }
+            }
+
+            if (imageFiles.length === 0) return false;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            (async () => {
+              for (const file of imageFiles) {
+                try {
+                  const res = await uploadAsset(file, notePathRef.current || "");
+                  const head = view.state.selection.main.head;
+                  const imgMarkdown = `![${res.name}](${res.markdownPath})\n`;
+                  view.dispatch({
+                    changes: { from: head, to: head, insert: imgMarkdown },
+                    selection: { anchor: head + imgMarkdown.length },
+                    scrollIntoView: true,
+                  });
+                } catch (err: unknown) {
+                  // eslint-disable-next-line no-alert
+                  alert(
+                    `图片上传失败: ${err instanceof Error ? err.message : "未知错误"}`,
+                  );
+                }
+              }
+            })();
+            return true;
+          },
+          drop: (e, view) => {
+            const files = e.dataTransfer?.files;
+            if (!files || files.length === 0) return false;
+
+            const imageFiles: File[] = [];
+            for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              if (file.type.startsWith("image/")) {
+                imageFiles.push(file);
+              }
+            }
+
+            if (imageFiles.length === 0) return false;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const pos =
+              view.posAtCoords({
+                x: e.clientX,
+                y: e.clientY,
+              }) ?? view.state.selection.main.head;
+
+            (async () => {
+              for (const file of imageFiles) {
+                try {
+                  const res = await uploadAsset(file, notePathRef.current || "");
+                  const imgMarkdown = `![${res.name}](${res.markdownPath})\n`;
+                  view.dispatch({
+                    changes: { from: pos, to: pos, insert: imgMarkdown },
+                    selection: { anchor: pos + imgMarkdown.length },
+                    scrollIntoView: true,
+                  });
+                } catch (err: unknown) {
+                  // eslint-disable-next-line no-alert
+                  alert(
+                    `图片上传失败: ${err instanceof Error ? err.message : "未知错误"}`,
+                  );
+                }
+              }
+            })();
+            return true;
           },
         }),
       );

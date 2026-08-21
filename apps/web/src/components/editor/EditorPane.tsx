@@ -121,6 +121,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
                 <VimMarkdownEditor
                   key={`${notePath}-vim`}
                   ref={activeEditorRef}
+                  notePath={notePath}
                   value={initialContent}
                   theme={theme}
                   vimRelativeLineNumbers={vimRelativeLineNumbers}
