@@ -55,8 +55,22 @@ export const VditorEditor = forwardRef<EditorHandle, VditorEditorProps>(
         focus: () => {
           editorRef.current?.focus();
         },
+        scrollToHeading: (heading) => {
+          const hostEl = document.getElementById(hostId);
+          if (!hostEl) return;
+          const resetEl = hostEl.querySelector(".vditor-ir .vditor-reset") || hostEl;
+          const headingEls = resetEl.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6, [data-type^='h']");
+          for (let i = 0; i < headingEls.length; i++) {
+            const el = headingEls[i];
+            const text = el.textContent?.trim().replace(/^#+\s*/, "").replace(/\s+#+$/, "");
+            if (text === heading.text || el.textContent?.includes(heading.text)) {
+              el.scrollIntoView({ behavior: "smooth", block: "start" });
+              break;
+            }
+          }
+        },
       }),
-      [],
+      [hostId],
     );
 
   // Initialize Vditor instance

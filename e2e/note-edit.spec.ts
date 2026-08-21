@@ -46,20 +46,20 @@ function resetTestVault() {
     fs.writeFileSync(exampleFixturePath, originalExampleContent, "utf8");
   }
 
-  // 3. Clean up any created copy files
-  const copyFile = path.resolve(
-    process.cwd(),
+  // 3. Clean up any created copy or temp files
+  const tempFiles = [
     "test-vault/projects/welcome.md",
-  );
-  if (fs.existsSync(copyFile)) {
-    fs.unlinkSync(copyFile);
-  }
-  const copyFile2 = path.resolve(
-    process.cwd(),
     "test-vault/projects/welcome copy.md",
-  );
-  if (fs.existsSync(copyFile2)) {
-    fs.unlinkSync(copyFile2);
+    "test-vault/second-note.md",
+    "test-vault/inbox/second-note.md",
+    "test-vault/tab-test-note.md",
+    "test-vault/inbox/tab-test-note.md",
+  ];
+  for (const rel of tempFiles) {
+    const full = path.resolve(process.cwd(), rel);
+    if (fs.existsSync(full)) {
+      fs.unlinkSync(full);
+    }
   }
 }
 
@@ -2370,6 +2370,165 @@ test.describe("Note Web E2E Suite", () => {
     const statusBar = page.locator(".statusbar");
     await expect(statusBar).toContainText("已保存", { timeout: 8000 });
   });
+
+  test("Feature 1: Document Outline / TOC toggle, real-time headings, and click navigation", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/Note Web/);
+
+    // Switch to Vim mode for precise typing and heading test
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "VIM" });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+
+    // 1. Toggle Outline open via TopBar button
+    const outlineToggleBtn = page.locator("button[aria-label*='大纲']");
+    await expect(outlineToggleBtn).toBeVisible();
+    await outlineToggleBtn.click();
+
+    const outlinePanel = page.locator(".outline-panel");
+    await expect(outlinePanel).toBeVisible();
+
+    // 2. Type headings into the editor and verify outline updates in real-time
+    await cmContent.click();
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.insertText("\n# Main Heading 1\n\nSome text here\n\n## Sub Heading 1.1\n\nMore text\n\n### Sub Heading 1.1.1\n\n");
+    await page.keyboard.press("Escape");
+
+    await expect(outlinePanel.getByText("Main Heading 1", { exact: true })).toBeVisible();
+    await expect(outlinePanel.getByText("Sub Heading 1.1", { exact: true })).toBeVisible();
+    await expect(outlinePanel.getByText("Sub Heading 1.1.1", { exact: true })).toBeVisible();
+
+    // 3. Click heading item in Outline
+    await outlinePanel.getByText("Sub Heading 1.1", { exact: true }).click();
+
+    // 4. Toggle Outline via Ctrl+Alt+O shortcut
+    await page.keyboard.press("Control+Alt+o");
+    await expect(outlinePanel).not.toBeVisible();
+
+    await page.keyboard.press("Control+Alt+o");
+    await expect(outlinePanel).toBeVisible();
+  });
+
+  test("Feature 2: Multi-note Tabs, switching, dirty indicators, and close behavior", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/Note Web/);
+
+    const tabBar = page.locator(".tab-bar");
+    await expect(tabBar).toBeVisible();
+
+    // Verify initial tab exists
+    const initialTabs = page.locator(".tab-item");
+    await expect(initialTabs).toHaveCount(1);
+
+    // Open a second note from sidebar or create one
+    const projectsFolder = page.locator(".folder-name", { hasText: "projects" });
+    if (await projectsFolder.isVisible()) {
+      await projectsFolder.click();
+    }
+    const secondNote = page.locator(".tree-item", { hasText: "example.md" });
+    if (await secondNote.isVisible()) {
+      await secondNote.click();
+    } else {
+      await page.keyboard.press("Control+Shift+n");
+      const noteInput = page.locator("input.form-input");
+      await expect(noteInput).toBeVisible();
+      await noteInput.fill("tab-test-note.md");
+      await page.keyboard.press("Enter");
+    }
+
+    // Verify two tabs now exist
+    const tabsList = page.locator(".tab-item");
+    await expect(tabsList).toHaveCount(2);
+
+    // Active tab has .active class
+    const activeTab = page.locator(".tab-item.active");
+    await expect(activeTab).toBeVisible();
+
+    // Switch to VIM mode for consistent editing
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "VIM" });
+    await vimBtn.click();
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+
+    // Switch back to welcome.md tab by clicking tab
+    const welcomeTab = page.locator(".tab-item", { hasText: "welcome.md" });
+    await welcomeTab.click();
+    await expect(welcomeTab).toHaveClass(/active/);
+
+    // Edit content to create dirty status
+    await cmContent.click();
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.insertText("Dirty draft edit in welcome tab");
+    await page.keyboard.press("Escape");
+
+    // Dirty indicator dot should be visible on welcome.md tab
+    const dirtyDot = welcomeTab.locator(".tab-dirty-indicator");
+    await expect(dirtyDot).toBeVisible();
+
+    // Close the second tab
+    const secondTab = page.locator(".tab-item").nth(1);
+    await secondTab.hover();
+    const secondTabCloseBtn = secondTab.locator(".tab-close-btn");
+    await secondTabCloseBtn.click({ force: true });
+    await expect(page.locator(".tab-item")).toHaveCount(1);
+  });
+
+  test("Feature 3: Vim Mode Markdown Preview split view and live sync", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/Note Web/);
+
+    // Switch to Vim mode
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "VIM" });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+
+    // 1. Toggle Markdown preview via button
+    const previewToggleBtn = page.locator("button[aria-label*='实时预览']");
+    await expect(previewToggleBtn).toBeVisible();
+    await previewToggleBtn.click();
+
+    const splitContainer = page.locator(".vim-split-container");
+    const previewPane = page.locator(".vim-split-preview");
+    await expect(splitContainer).toBeVisible();
+    await expect(previewPane).toBeVisible();
+
+    // 2. Type markdown in CodeMirror Vim and verify immediate live render in preview
+    await cmContent.click();
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.insertText("\n### Live Preview Heading Test\n\n- [x] Live Task Item\n- [ ] Unfinished Task\n\n> Blockquote live render\n\n");
+    await page.keyboard.press("Escape");
+
+    // Verify preview contains the rendered elements
+    const renderedHeading = previewPane.locator("h3", { hasText: "Live Preview Heading Test" });
+    await expect(renderedHeading).toBeVisible();
+    await expect(previewPane.locator(".task-list-item")).toHaveCount(2);
+    await expect(previewPane.locator("blockquote")).toContainText("Blockquote live render");
+
+    // 3. Toggle preview with shortcut Ctrl+Alt+V
+    await page.keyboard.press("Control+Alt+v");
+    await expect(previewPane).not.toBeVisible();
+
+    // Vim mode and content remain fully intact
+    await expect(cmContent).toContainText("Live Preview Heading Test");
+
+    // Toggle back with shortcut
+    await page.keyboard.press("Control+Alt+v");
+    await expect(previewPane).toBeVisible();
+  });
 });
+
 
 

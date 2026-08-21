@@ -9,6 +9,8 @@ interface ShortcutsOptions {
   onNewNote?: () => void;
   onOpenSettings?: () => void;
   onEscape?: () => void;
+  onToggleOutline?: () => void;
+  onToggleVimPreview?: () => void;
 }
 
 export function useKeyboardShortcuts(options: ShortcutsOptions) {
@@ -51,6 +53,12 @@ export function useKeyboardShortcuts(options: ShortcutsOptions) {
             break;
           case "settings":
             options.onOpenSettings?.();
+            break;
+          case "toggle-outline":
+            options.onToggleOutline?.();
+            break;
+          case "toggle-vim-preview":
+            options.onToggleVimPreview?.();
             break;
         }
         return;

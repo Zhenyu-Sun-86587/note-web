@@ -11,6 +11,8 @@ export const NOTE_WEB_APP_SHORTCUTS = [
   { key: "f", ctrl: true, shift: true, desc: "Global search (Ctrl+Shift+F)" },
   { key: "b", ctrl: true, shift: true, desc: "Toggle sidebar (Ctrl+Shift+B)" },
   { key: ",", ctrl: true, shift: true, desc: "Settings (Ctrl+Shift+,)" },
+  { key: "o", ctrl: true, alt: true, desc: "Toggle outline (Ctrl+Alt+O)" },
+  { key: "v", ctrl: true, alt: true, desc: "Toggle Vim preview (Ctrl+Alt+V)" },
 ] as const;
 
 export type AppAction =
@@ -19,10 +21,12 @@ export type AppAction =
   | "new-note"
   | "settings"
   | "search"
-  | "sidebar";
+  | "sidebar"
+  | "toggle-outline"
+  | "toggle-vim-preview";
 
 /**
- * Checks if a keyboard event matches a Note Web App-owned shortcut (Ctrl+Shift+...).
+ * Checks if a keyboard event matches a Note Web App-owned shortcut.
  */
 export function isAppOwnedShortcut(e: KeyboardEvent | {
   key: string;
@@ -37,18 +41,27 @@ export function isAppOwnedShortcut(e: KeyboardEvent | {
     /Macintosh|Mac OS X/i.test(navigator.userAgent);
   const mod = isMac ? (e.metaKey || e.ctrlKey) : e.ctrlKey;
 
-  // App shortcuts strictly require Ctrl (or Cmd on Mac) + Shift (and no Alt)
-  if (!mod || !e.shiftKey || e.altKey) {
+  if (!mod) {
     return null;
   }
 
   const key = e.key.toLowerCase();
-  if (key === "s") return "save";
-  if (key === "p") return "quick-open";
-  if (key === "n") return "new-note";
-  if (key === "f") return "search";
-  if (key === "b") return "sidebar";
-  if (key === "," || key === "<" || e.code === "Comma") return "settings";
+
+  // App shortcuts with Ctrl/Cmd + Shift (no Alt)
+  if (e.shiftKey && !e.altKey) {
+    if (key === "s") return "save";
+    if (key === "p") return "quick-open";
+    if (key === "n") return "new-note";
+    if (key === "f") return "search";
+    if (key === "b") return "sidebar";
+    if (key === "," || key === "<" || e.code === "Comma") return "settings";
+  }
+
+  // Safe App shortcuts with Ctrl/Cmd + Alt (no Shift)
+  if (e.altKey && !e.shiftKey) {
+    if (key === "o") return "toggle-outline";
+    if (key === "v") return "toggle-vim-preview";
+  }
 
   return null;
 }

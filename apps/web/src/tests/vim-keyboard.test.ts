@@ -7,8 +7,8 @@ import {
 } from "../utils/vim-keyboard";
 
 describe("Vim Keyboard Ownership", () => {
-  it("defines safe Ctrl+Shift App-owned shortcuts", () => {
-    expect(NOTE_WEB_APP_SHORTCUTS.length).toBe(6);
+  it("defines safe App-owned shortcuts", () => {
+    expect(NOTE_WEB_APP_SHORTCUTS.length).toBe(8);
     const keys = NOTE_WEB_APP_SHORTCUTS.map((s) => s.key);
     expect(keys).toContain("s");
     expect(keys).toContain("p");
@@ -16,9 +16,11 @@ describe("Vim Keyboard Ownership", () => {
     expect(keys).toContain("f");
     expect(keys).toContain("b");
     expect(keys).toContain(",");
+    expect(keys).toContain("o");
+    expect(keys).toContain("v");
   });
 
-  it("classifies App-owned shortcuts correctly via isAppOwnedShortcut (Ctrl+Shift+...)", () => {
+  it("classifies App-owned shortcuts correctly via isAppOwnedShortcut (Ctrl+Shift+... and Ctrl+Alt+...)", () => {
     expect(isAppOwnedShortcut({ key: "s", ctrlKey: true, shiftKey: true })).toBe("save");
     expect(isAppOwnedShortcut({ key: "S", ctrlKey: true, shiftKey: true })).toBe("save");
     expect(isAppOwnedShortcut({ key: "p", ctrlKey: true, shiftKey: true })).toBe("quick-open");
@@ -31,6 +33,10 @@ describe("Vim Keyboard Ownership", () => {
     expect(isAppOwnedShortcut({ key: "B", ctrlKey: true, shiftKey: true })).toBe("sidebar");
     expect(isAppOwnedShortcut({ key: ",", ctrlKey: true, shiftKey: true })).toBe("settings");
     expect(isAppOwnedShortcut({ key: "<", code: "Comma", ctrlKey: true, shiftKey: true })).toBe("settings");
+    expect(isAppOwnedShortcut({ key: "o", ctrlKey: true, altKey: true })).toBe("toggle-outline");
+    expect(isAppOwnedShortcut({ key: "O", ctrlKey: true, altKey: true })).toBe("toggle-outline");
+    expect(isAppOwnedShortcut({ key: "v", ctrlKey: true, altKey: true })).toBe("toggle-vim-preview");
+    expect(isAppOwnedShortcut({ key: "V", ctrlKey: true, altKey: true })).toBe("toggle-vim-preview");
   });
 
   it("does not classify plain Ctrl shortcuts as App-owned (without Shift)", () => {

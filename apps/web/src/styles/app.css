@@ -915,3 +915,306 @@ kbd {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
+/* Tab Bar */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  background-color: var(--panel-bg);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  user-select: none;
+  scrollbar-width: none;
+}
+
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-list {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  padding: 0 4px;
+  gap: 2px;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 100%;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  max-width: 200px;
+  position: relative;
+}
+
+.tab-item:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.tab-item.active {
+  color: var(--text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--accent);
+  background-color: var(--app-bg);
+}
+
+.tab-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-dirty-indicator {
+  color: var(--warning-text);
+  font-size: 10px;
+  line-height: 1;
+  margin-left: 2px;
+}
+
+.tab-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.tab-item:hover .tab-close-btn,
+.tab-item.active .tab-close-btn {
+  opacity: 0.7;
+}
+
+.tab-close-btn:hover {
+  opacity: 1 !important;
+  background-color: var(--active-bg);
+  color: var(--text-primary);
+}
+
+/* Editor with Outline Container */
+.editor-with-outline-container {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Outline Panel */
+.outline-panel {
+  width: 240px;
+  height: 100%;
+  border-left: 1px solid var(--border-color);
+  background-color: var(--panel-bg);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.outline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 36px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.outline-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.outline-header-icon {
+  color: var(--text-muted);
+}
+
+.outline-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background-color: var(--hover-bg);
+  padding: 1px 5px;
+  border-radius: 10px;
+}
+
+.outline-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.outline-close-btn:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.outline-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.outline-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.outline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.outline-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding-right: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  border-radius: 4px;
+  margin: 1px 6px;
+  width: calc(100% - 12px);
+}
+
+.outline-item:hover {
+  background-color: var(--hover-bg);
+}
+
+.outline-item.active {
+  background-color: var(--selected-bg);
+  color: var(--selected-text);
+  font-weight: 500;
+}
+
+.outline-item-level {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.outline-item.active .outline-item-level {
+  color: var(--selected-text);
+  opacity: 0.9;
+}
+
+.outline-item-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Vim Split Preview */
+.vim-split-container {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.vim-split-editor {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.vim-split-divider {
+  width: 1px;
+  background-color: var(--border-color);
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.vim-split-preview {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  overflow-y: auto;
+  background-color: var(--app-bg);
+}
+
+.note-web-markdown-preview {
+  height: 100%;
+  padding: 24px var(--editor-padding-x, 32px);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.markdown-preview-content {
+  max-width: var(--editor-max-width, 900px);
+  margin: 0 auto;
+  font-family: var(--font-editor);
+  font-size: var(--editor-font-size, 16px);
+  line-height: var(--editor-line-height, 1.75);
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.preview-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 24px 0;
+}
+
+/* Zen Mode Adjustments */
+.app-shell.zen-mode .tab-bar {
+  display: none !important;
+}
+
+.app-shell.zen-mode .editor-with-outline-container {
+  width: 100vw;
+  height: 100vh;
+}
+

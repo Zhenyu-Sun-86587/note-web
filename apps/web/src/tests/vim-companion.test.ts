@@ -225,6 +225,7 @@ describe("VimCompanionService and State Machine", () => {
 
     // Assert: immediately normal-pending
     expect(service.getInputState()).toBe("normal-pending");
+    await Promise.resolve();
     expect(messageSpy).toHaveBeenCalled();
 
     const pendingIds = service._mockGetPendingRequestIds();

@@ -1,6 +1,7 @@
 import { useRef, useImperativeHandle, forwardRef } from "react";
 import { VditorEditor } from "./VditorEditor";
 import { VimMarkdownEditor } from "./VimMarkdownEditor";
+import { MarkdownPreview } from "./MarkdownPreview";
 import { EmptyEditor } from "./EmptyEditor";
 import { ConflictBanner } from "./ConflictBanner";
 import type { Theme } from "./VditorEditor";
@@ -15,6 +16,7 @@ export interface EditorPaneProps {
   vimRelativeLineNumbers?: boolean;
   vimLineWrapping?: boolean;
   vimJjEscape?: boolean;
+  vimPreviewOpen?: boolean;
   onChange: (value: string) => void;
   onNewNote: () => void;
   onReloadConflict: () => void;
@@ -22,6 +24,7 @@ export interface EditorPaneProps {
   onSave?: () => void;
   onSwitchToIR?: () => void;
   onToggleZen?: () => void;
+  onCursorActivity?: (line: number) => void;
 }
 
 export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
@@ -35,6 +38,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       vimRelativeLineNumbers,
       vimLineWrapping,
       vimJjEscape,
+      vimPreviewOpen = false,
       onChange,
       onNewNote,
       onReloadConflict,
@@ -42,6 +46,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       onSave,
       onSwitchToIR,
       onToggleZen,
+      onCursorActivity,
     },
     ref,
   ) => {
@@ -52,6 +57,10 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       () => ({
         getValue: () => activeEditorRef.current?.getValue() ?? initialContent,
         focus: () => activeEditorRef.current?.focus(),
+        scrollToHeading: (heading) =>
+          activeEditorRef.current?.scrollToHeading?.(heading),
+        scrollToLine: (line) => activeEditorRef.current?.scrollToLine?.(line),
+        getCursorLine: () => activeEditorRef.current?.getCursorLine?.() ?? 1,
       }),
       [initialContent],
     );
@@ -70,19 +79,49 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         )}
         <div className="editor-wrapper">
           {editorMode === "vim" ? (
-            <VimMarkdownEditor
-              key={`${notePath}-vim`}
-              ref={activeEditorRef}
-              value={initialContent}
-              theme={theme}
-              vimRelativeLineNumbers={vimRelativeLineNumbers}
-              vimLineWrapping={vimLineWrapping}
-              vimJjEscape={vimJjEscape}
-              onChange={onChange}
-              onSave={onSave}
-              onSwitchToIR={onSwitchToIR}
-              onToggleZen={onToggleZen}
-            />
+            vimPreviewOpen ? (
+              <div className="vim-split-container">
+                <div className="vim-split-editor">
+                  <VimMarkdownEditor
+                    key={`${notePath}-vim`}
+                    ref={activeEditorRef}
+                    value={initialContent}
+                    theme={theme}
+                    vimRelativeLineNumbers={vimRelativeLineNumbers}
+                    vimLineWrapping={vimLineWrapping}
+                    vimJjEscape={vimJjEscape}
+                    onChange={onChange}
+                    onSave={onSave}
+                    onSwitchToIR={onSwitchToIR}
+                    onToggleZen={onToggleZen}
+                    onCursorActivity={onCursorActivity}
+                  />
+                </div>
+                <div className="vim-split-divider" />
+                <div className="vim-split-preview">
+                  <MarkdownPreview
+                    notePath={notePath}
+                    content={initialContent}
+                    theme={theme}
+                  />
+                </div>
+              </div>
+            ) : (
+              <VimMarkdownEditor
+                key={`${notePath}-vim`}
+                ref={activeEditorRef}
+                value={initialContent}
+                theme={theme}
+                vimRelativeLineNumbers={vimRelativeLineNumbers}
+                vimLineWrapping={vimLineWrapping}
+                vimJjEscape={vimJjEscape}
+                onChange={onChange}
+                onSave={onSave}
+                onSwitchToIR={onSwitchToIR}
+                onToggleZen={onToggleZen}
+                onCursorActivity={onCursorActivity}
+              />
+            )
           ) : (
             <VditorEditor
               key={`${notePath}-ir`}

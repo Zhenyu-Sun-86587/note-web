@@ -74,6 +74,7 @@ export interface VimMarkdownEditorProps {
   vimRelativeLineNumbers?: boolean;
   vimLineWrapping?: boolean;
   vimJjEscape?: boolean;
+  onCursorActivity?: (line: number) => void;
 }
 
 // Global active instance tracker for Ex commands
@@ -163,6 +164,7 @@ export const VimMarkdownEditor = forwardRef<
       vimRelativeLineNumbers = true,
       vimLineWrapping = true,
       vimJjEscape = false,
+      onCursorActivity,
     },
     ref,
   ) => {
@@ -177,6 +179,8 @@ export const VimMarkdownEditor = forwardRef<
     onSwitchToIRRef.current = onSwitchToIR;
     const onToggleZenRef = useRef(onToggleZen);
     onToggleZenRef.current = onToggleZen;
+    const onCursorActivityRef = useRef(onCursorActivity);
+    onCursorActivityRef.current = onCursorActivity;
 
     const lineNumberCompartment = useRef(new Compartment()).current;
     const lineWrappingCompartment = useRef(new Compartment()).current;
@@ -284,6 +288,7 @@ export const VimMarkdownEditor = forwardRef<
 
     // Subscribe to Companion state changes to immediately route focus when ASCII ready
     useEffect(() => {
+      setCompanionState(vimCompanion.getInputState());
       return vimCompanion.subscribe(() => {
         const nextState = vimCompanion.getInputState();
         setCompanionState(nextState);
@@ -308,6 +313,39 @@ export const VimMarkdownEditor = forwardRef<
         },
         focus: () => {
           syncFocus();
+        },
+        scrollToHeading: (heading) => {
+          if (viewRef.current) {
+            const totalLines = viewRef.current.state.doc.lines;
+            const targetLine = Math.max(1, Math.min(heading.line, totalLines));
+            const lineObj = viewRef.current.state.doc.line(targetLine);
+            viewRef.current.dispatch({
+              selection: { anchor: lineObj.from },
+              scrollIntoView: true,
+            });
+            viewRef.current.focus();
+            syncFocus();
+          }
+        },
+        scrollToLine: (line: number) => {
+          if (viewRef.current) {
+            const totalLines = viewRef.current.state.doc.lines;
+            const targetLine = Math.max(1, Math.min(line, totalLines));
+            const lineObj = viewRef.current.state.doc.line(targetLine);
+            viewRef.current.dispatch({
+              selection: { anchor: lineObj.from },
+              scrollIntoView: true,
+            });
+            viewRef.current.focus();
+            syncFocus();
+          }
+        },
+        getCursorLine: () => {
+          if (viewRef.current) {
+            const head = viewRef.current.state.selection.main.head;
+            return viewRef.current.state.doc.lineAt(head).number;
+          }
+          return 1;
         },
       }),
       [],
@@ -351,6 +389,11 @@ export const VimMarkdownEditor = forwardRef<
               proxyRef.current,
               containerRef.current,
             );
+          }
+          if (update.selectionSet) {
+            const head = update.state.selection.main.head;
+            const currentLine = update.state.doc.lineAt(head).number;
+            onCursorActivityRef.current?.(currentLine);
           }
         }
         if (update.docChanged) {

@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import { EditorPane } from "./components/editor/EditorPane";
+import { TabBar, type TabItem } from "./components/tabs/TabBar";
+import { OutlinePanel } from "./components/outline/OutlinePanel";
 import { QuickOpenDialog } from "./components/search/QuickOpenDialog";
 import { SearchDialog } from "./components/search/SearchDialog";
 import { NewNoteDialog } from "./components/dialogs/NewNoteDialog";
@@ -23,6 +25,7 @@ import {
   fetchTree,
   fetchNote,
   createNote,
+  saveNote,
   renameOrMoveNote,
   renameFolder,
   deleteNote,
@@ -41,6 +44,7 @@ import type { EditorHandle } from "./components/editor/EditorHandle";
 import { generateConflictPath } from "./utils/filename";
 import { getDirname, getBasename } from "./utils/note-path";
 import { generateCopyFilename } from "./utils/copy-name";
+import { parseHeadings, type HeadingItem } from "./utils/outline-parser";
 
 function getFilenamesInFolder(tree: TreeNode[], folderPath: string): string[] {
   if (!folderPath) {
@@ -108,6 +112,11 @@ export default function App() {
   );
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Tabs state
+  const [tabs, setTabs] = useState<TabItem[]>([]);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
   const [openNote, setOpenNote] = useState<NoteDocument | null>(null);
   const [draftContent, setDraftContent] = useState("");
   const draftContentRef = useRef(draftContent);
@@ -117,6 +126,50 @@ export default function App() {
   openNoteRef.current = openNote;
 
   const hasAutoOpenedRef = useRef(false);
+
+  // Outline state
+  const [outlineOpen, setOutlineOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("note-web-outline-open-v1") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [cursorLine, setCursorLine] = useState<number | null>(1);
+  const headings = useMemo(() => parseHeadings(draftContent), [draftContent]);
+
+  const toggleOutline = useCallback(() => {
+    setOutlineOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("note-web-outline-open-v1", String(next));
+      } catch {
+        // ignore storage error
+      }
+      return next;
+    });
+  }, []);
+
+  // Vim Preview state
+  const [vimPreviewOpen, setVimPreviewOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("note-web-vim-preview-open-v1") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleVimPreview = useCallback(() => {
+    setVimPreviewOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("note-web-vim-preview-open-v1", String(next));
+      } catch {
+        // ignore storage error
+      }
+      return next;
+    });
+  }, []);
 
   // Dialogs state
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -224,11 +277,37 @@ export default function App() {
     loadTree();
   }, [loadTree]);
 
+  // Draft update syncing into active tab
+  const handleDraftChange = useCallback((val: string) => {
+    setDraftContent(val);
+    const currentPath = openNoteRef.current?.path;
+    if (currentPath) {
+      setTabs((prev) =>
+        prev.map((t) => (t.path === currentPath ? { ...t, draftContent: val } : t)),
+      );
+    }
+  }, []);
+
   // Open note
   const handleOpenNote = useCallback(
     async (notePath: string) => {
       try {
         const doc = await fetchNote(notePath);
+        const newTab: TabItem = {
+          path: doc.path,
+          title: getBasename(doc.path),
+          draftContent: doc.content,
+          savedContent: doc.content,
+          revision: doc.revision,
+          saveStatus: "idle",
+          doc,
+        };
+        setTabs((prev) => {
+          if (prev.some((t) => t.path === doc.path)) {
+            return prev;
+          }
+          return [...prev, newTab];
+        });
         setOpenNote(doc);
         setDraftContent(doc.content);
       } catch (err: unknown) {
@@ -321,6 +400,19 @@ export default function App() {
     enabled: Boolean(openNote) && isDirty,
     onSaved: (doc) => {
       setOpenNote(doc);
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.path === doc.path
+            ? {
+                ...t,
+                savedContent: doc.content,
+                revision: doc.revision,
+                saveStatus: "saved",
+                doc,
+              }
+            : t,
+        ),
+      );
     },
   });
 
@@ -332,19 +424,129 @@ export default function App() {
     return saveNow();
   }, [saveNow]);
 
-  // Switch note safely flushing dirty changes
+  // Switch note safely flushing dirty changes & activating tab
   const switchNote = useCallback(
     async (targetPath: string) => {
-      if (openNote?.path === targetPath) return;
+      const currentPath = openNoteRef.current?.path;
+      if (currentPath === targetPath) return;
+
+      // Sync active editor value
+      const currentRealValue = editorPaneRef.current?.getValue();
+      if (
+        typeof currentRealValue === "string" &&
+        currentRealValue !== draftContentRef.current
+      ) {
+        setDraftContent(currentRealValue);
+        draftContentRef.current = currentRealValue;
+        if (currentPath) {
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.path === currentPath ? { ...t, draftContent: currentRealValue } : t,
+            ),
+          );
+        }
+      }
 
       if (!(await flushCurrentNote())) {
         return;
       }
 
-      resetStatus("idle");
-      await handleOpenNote(targetPath);
+      // Check if tab already exists
+      const existingTab = tabsRef.current.find((t) => t.path === targetPath);
+      if (existingTab) {
+        setOpenNote(existingTab.doc);
+        setDraftContent(existingTab.draftContent);
+        resetStatus(
+          existingTab.draftContent !== existingTab.savedContent ? "dirty" : "idle",
+        );
+      } else {
+        try {
+          const doc = await fetchNote(targetPath);
+          const newTab: TabItem = {
+            path: doc.path,
+            title: getBasename(doc.path),
+            draftContent: doc.content,
+            savedContent: doc.content,
+            revision: doc.revision,
+            saveStatus: "idle",
+            doc,
+          };
+          setTabs((prev) => {
+            if (prev.some((t) => t.path === doc.path)) return prev;
+            return [...prev, newTab];
+          });
+          setOpenNote(doc);
+          setDraftContent(doc.content);
+          resetStatus("idle");
+        } catch (err: unknown) {
+          // eslint-disable-next-line no-alert
+          alert(`打开笔记失败: ${err instanceof Error ? err.message : "未知错误"}`);
+        }
+      }
     },
-    [openNote, flushCurrentNote, resetStatus, handleOpenNote],
+    [flushCurrentNote, resetStatus],
+  );
+
+  // Close tab
+  const handleCloseTab = useCallback(
+    async (tabPath: string) => {
+      const currentTabs = tabsRef.current;
+      const targetTab = currentTabs.find((t) => t.path === tabPath);
+      if (!targetTab) return;
+
+      const isActive = openNoteRef.current?.path === tabPath;
+
+      if (isActive) {
+        // Sync active editor value
+        const currentRealValue = editorPaneRef.current?.getValue();
+        if (
+          typeof currentRealValue === "string" &&
+          currentRealValue !== draftContentRef.current
+        ) {
+          setDraftContent(currentRealValue);
+          draftContentRef.current = currentRealValue;
+        }
+
+        if (isDirtyRef.current) {
+          const saved = await flushCurrentNote();
+          if (!saved) return;
+        }
+
+        const targetIndex = currentTabs.findIndex((t) => t.path === tabPath);
+        const nextTabs = currentTabs.filter((t) => t.path !== tabPath);
+        setTabs(nextTabs);
+
+        if (nextTabs.length === 0) {
+          setOpenNote(null);
+          setDraftContent("");
+          resetStatus("idle");
+        } else {
+          const nextIndex = Math.min(targetIndex, nextTabs.length - 1);
+          const nextTab = nextTabs[nextIndex];
+          setOpenNote(nextTab.doc);
+          setDraftContent(nextTab.draftContent);
+          resetStatus(
+            nextTab.draftContent !== nextTab.savedContent ? "dirty" : "idle",
+          );
+        }
+      } else {
+        // Inactive tab
+        const isTabDirty = targetTab.draftContent !== targetTab.savedContent;
+        if (isTabDirty && targetTab.revision) {
+          try {
+            await saveNote(targetTab.path, targetTab.draftContent, targetTab.revision);
+          } catch (err: unknown) {
+            // eslint-disable-next-line no-alert
+            alert(
+              `保存标签页失败: ${err instanceof Error ? err.message : "未知错误"}`,
+            );
+            return;
+          }
+        }
+        setTabs((prev) => prev.filter((t) => t.path !== tabPath));
+      }
+    },
+    [flushCurrentNote, resetStatus],
   );
 
   // Folder expand toggle
@@ -387,6 +589,19 @@ export default function App() {
           // Not dirty, safe to reload disk changes automatically
           setOpenNote(latest);
           setDraftContent(latest.content);
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.path === latest.path
+                ? {
+                    ...t,
+                    draftContent: latest.content,
+                    savedContent: latest.content,
+                    revision: latest.revision,
+                    saveStatus: "idle",
+                  }
+                : t,
+            ),
+          );
         } else {
           // Dirty, trigger conflict!
           setStatus("conflict");
@@ -404,6 +619,19 @@ export default function App() {
       const doc = await fetchNote(openNote.path);
       setOpenNote(doc);
       setDraftContent(doc.content);
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.path === doc.path
+            ? {
+                ...t,
+                draftContent: doc.content,
+                savedContent: doc.content,
+                revision: doc.revision,
+                saveStatus: "idle",
+              }
+            : t,
+        ),
+      );
       resetStatus("idle");
     } catch (err: unknown) {
       // eslint-disable-next-line no-alert
@@ -419,6 +647,18 @@ export default function App() {
       await loadTree();
       setOpenNote(newDoc);
       setDraftContent(newDoc.content);
+      setTabs((prev) => [
+        ...prev,
+        {
+          path: newDoc.path,
+          title: getBasename(newDoc.path),
+          draftContent: newDoc.content,
+          savedContent: newDoc.content,
+          revision: newDoc.revision,
+          saveStatus: "idle",
+          doc: newDoc,
+        },
+      ]);
       resetStatus("idle");
     } catch (err: unknown) {
       // eslint-disable-next-line no-alert
@@ -436,6 +676,19 @@ export default function App() {
     const newDoc = await createNote(fullPath, "");
     await loadTree();
     resetStatus("idle");
+    const newTab: TabItem = {
+      path: newDoc.path,
+      title: getBasename(newDoc.path),
+      draftContent: "",
+      savedContent: "",
+      revision: newDoc.revision,
+      saveStatus: "idle",
+      doc: newDoc,
+    };
+    setTabs((prev) => {
+      if (prev.some((t) => t.path === newDoc.path)) return prev;
+      return [...prev, newTab];
+    });
     setOpenNote(newDoc);
     setDraftContent("");
     const dir = getDirname(fullPath);
@@ -462,6 +715,13 @@ export default function App() {
         }
       }
       await renameOrMoveNote(renameTarget.path, newPath);
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.path === renameTarget.path
+            ? { ...t, path: newPath, title: getBasename(newPath) }
+            : t,
+        ),
+      );
       if (currentOpenNote?.path === renameTarget.path) {
         setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
       }
@@ -478,6 +738,20 @@ export default function App() {
       }
 
       await renameFolder(renameTarget.path, newPath);
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.path === renameTarget.path) {
+            return { ...t, path: newPath, title: getBasename(newPath) };
+          }
+          if (t.path.startsWith(`${renameTarget.path}/`)) {
+            const suffix = t.path.slice(renameTarget.path.length);
+            const remapPath = `${newPath}${suffix}`;
+            return { ...t, path: remapPath, title: getBasename(remapPath) };
+          }
+          return t;
+        }),
+      );
+
       // Remap openNote path if it is inside renamed folder
       if (
         currentOpenNote &&
@@ -518,6 +792,13 @@ export default function App() {
       }
     }
     await renameOrMoveNote(moveTarget, newPath);
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.path === moveTarget
+          ? { ...t, path: newPath, title: getBasename(newPath) }
+          : t,
+      ),
+    );
     if (openNote?.path === moveTarget) {
       setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
     }
@@ -547,13 +828,32 @@ export default function App() {
         }
       }
       await deleteNote(deleteTarget.path);
-      if (openNote?.path === deleteTarget.path) {
-        resetStatus("idle");
-        setOpenNote(null);
-        setDraftContent("");
-      }
+      await handleCloseTab(deleteTarget.path);
     } else {
-      await deleteFolder(deleteTarget.path);
+      const folder = deleteTarget.path;
+      await deleteFolder(folder);
+      const remainingTabs = tabsRef.current.filter(
+        (t) => t.path !== folder && !t.path.startsWith(`${folder}/`),
+      );
+      setTabs(remainingTabs);
+      const isCurrentInside =
+        openNoteRef.current &&
+        (openNoteRef.current.path === folder ||
+          openNoteRef.current.path.startsWith(`${folder}/`));
+      if (isCurrentInside) {
+        if (remainingTabs.length === 0) {
+          setOpenNote(null);
+          setDraftContent("");
+          resetStatus("idle");
+        } else {
+          const nextTab = remainingTabs[0];
+          setOpenNote(nextTab.doc);
+          setDraftContent(nextTab.draftContent);
+          resetStatus(
+            nextTab.draftContent !== nextTab.savedContent ? "dirty" : "idle",
+          );
+        }
+      }
     }
 
     await loadTree();
@@ -620,8 +920,21 @@ export default function App() {
         ? `${targetFolder}/${targetFilename}`
         : targetFilename;
 
-      await createNote(targetPath, sourceDoc.content);
+      const createdDoc = await createNote(targetPath, sourceDoc.content);
       await loadTree();
+
+      const newTab: TabItem = {
+        path: createdDoc.path,
+        title: getBasename(createdDoc.path),
+        draftContent: createdDoc.content,
+        savedContent: createdDoc.content,
+        revision: createdDoc.revision,
+        saveStatus: "idle",
+        doc: createdDoc,
+      };
+      setTabs((prev) => [...prev, newTab]);
+      setOpenNote(createdDoc);
+      setDraftContent(createdDoc.content);
 
       if (targetFolder) {
         setExpandedFolders((prev) => new Set([...prev, targetFolder]));
@@ -691,6 +1004,11 @@ export default function App() {
     zenMode,
   ]);
 
+  // Outline navigation
+  const handleSelectHeading = useCallback((heading: HeadingItem) => {
+    editorPaneRef.current?.scrollToHeading?.(heading);
+  }, []);
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onSave: () => {
@@ -705,6 +1023,8 @@ export default function App() {
       setNewNoteOpen(true);
     },
     onOpenSettings: () => setSettingsOpen(true),
+    onToggleOutline: toggleOutline,
+    onToggleVimPreview: toggleVimPreview,
   });
 
   const effectiveSaveStatus =
@@ -779,29 +1099,52 @@ export default function App() {
           }
         }}
         onDelete={handleDeleteCurrentNote}
+        outlineOpen={outlineOpen}
+        onToggleOutline={toggleOutline}
+        vimPreviewOpen={vimPreviewOpen}
+        onToggleVimPreview={toggleVimPreview}
       />
 
-      <EditorPane
-        ref={editorPaneRef}
-        notePath={openNote?.path ?? null}
-        initialContent={draftContent}
-        hasConflict={saveStatus === "conflict"}
-        theme={effectiveTheme}
-        editorMode={editorMode}
-        vimRelativeLineNumbers={settings.vimRelativeLineNumbers}
-        vimLineWrapping={settings.vimLineWrapping}
-        vimJjEscape={settings.vimJjEscape}
-        onChange={(val) => setDraftContent(val)}
-        onNewNote={() => {
-          setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
-          setNewNoteOpen(true);
-        }}
-        onReloadConflict={handleReloadConflict}
-        onSaveAsConflictCopy={handleSaveAsConflictCopy}
-        onSave={saveNow}
-        onSwitchToIR={() => handleSwitchEditorMode("ir")}
-        onToggleZen={toggleZenMode}
+      <TabBar
+        tabs={tabs}
+        activePath={openNote?.path ?? null}
+        onSelectTab={switchNote}
+        onCloseTab={handleCloseTab}
       />
+
+      <div className="editor-with-outline-container">
+        <EditorPane
+          ref={editorPaneRef}
+          notePath={openNote?.path ?? null}
+          initialContent={draftContent}
+          hasConflict={saveStatus === "conflict"}
+          theme={effectiveTheme}
+          editorMode={editorMode}
+          vimRelativeLineNumbers={settings.vimRelativeLineNumbers}
+          vimLineWrapping={settings.vimLineWrapping}
+          vimJjEscape={settings.vimJjEscape}
+          vimPreviewOpen={vimPreviewOpen}
+          onChange={handleDraftChange}
+          onNewNote={() => {
+            setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
+            setNewNoteOpen(true);
+          }}
+          onReloadConflict={handleReloadConflict}
+          onSaveAsConflictCopy={handleSaveAsConflictCopy}
+          onSave={saveNow}
+          onSwitchToIR={() => handleSwitchEditorMode("ir")}
+          onToggleZen={toggleZenMode}
+          onCursorActivity={(line) => setCursorLine(line)}
+        />
+
+        <OutlinePanel
+          headings={headings}
+          activeLine={cursorLine}
+          isOpen={outlineOpen}
+          onClose={() => setOutlineOpen(false)}
+          onSelectHeading={handleSelectHeading}
+        />
+      </div>
 
       <StatusBar
         saveStatus={effectiveSaveStatus}

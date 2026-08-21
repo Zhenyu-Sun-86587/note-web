@@ -8,6 +8,8 @@ import {
   FolderInput,
   Trash2,
   Maximize2,
+  AlignLeft,
+  Columns,
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
 import { Button } from "../common/Button";
@@ -25,6 +27,10 @@ interface TopBarProps {
   onRename: () => void;
   onMove: () => void;
   onDelete: () => void;
+  outlineOpen?: boolean;
+  onToggleOutline?: () => void;
+  vimPreviewOpen?: boolean;
+  onToggleVimPreview?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -40,6 +46,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   onRename,
   onMove,
   onDelete,
+  outlineOpen = false,
+  onToggleOutline,
+  vimPreviewOpen = false,
+  onToggleVimPreview,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -145,6 +155,34 @@ export const TopBar: React.FC<TopBarProps> = ({
               )}
             </div>
           </>
+        )}
+
+        {editorMode === "vim" && onToggleVimPreview && (
+          <IconButton
+            icon={<Columns size={18} />}
+            label={
+              vimPreviewOpen
+                ? "关闭实时预览 (Ctrl+Alt+V)"
+                : "开启实时预览 (Ctrl+Alt+V)"
+            }
+            onClick={onToggleVimPreview}
+            className={vimPreviewOpen ? "active" : ""}
+            size="sm"
+          />
+        )}
+
+        {onToggleOutline && (
+          <IconButton
+            icon={<AlignLeft size={18} />}
+            label={
+              outlineOpen
+                ? "隐藏文档大纲 (Ctrl+Alt+O)"
+                : "显示文档大纲 (Ctrl+Alt+O)"
+            }
+            onClick={onToggleOutline}
+            className={outlineOpen ? "active" : ""}
+            size="sm"
+          />
         )}
 
         <IconButton
