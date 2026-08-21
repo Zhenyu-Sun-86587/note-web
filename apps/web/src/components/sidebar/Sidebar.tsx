@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-actions">
           <IconButton
             icon={<FilePlus size={16} />}
-            label="新建笔记 (Ctrl+Alt+N)"
+            label="新建笔记 (Ctrl+Shift+N)"
             onClick={onNewNote}
             size="sm"
           />
@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
           <IconButton
             icon={<Search size={16} />}
-            label="全文搜索 (Ctrl+Alt+F)"
+            label="全文搜索 (Ctrl+Shift+F)"
             onClick={onOpenSearch}
             size="sm"
           />
@@ -82,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-quick-open">
         <button className="quick-open-btn" onClick={onOpenQuickOpen}>
           <Zap size={14} />
-          <span>快速打开... (Ctrl+Alt+P)</span>
+          <span>快速打开... (Ctrl+Shift+P)</span>
         </button>
       </div>
 

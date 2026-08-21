@@ -141,37 +141,46 @@ export function forwardKeyToVim(
   const cm = getCM(view);
   if (!cm) return false;
 
-  const mockEvent = {
-    key: eventLike.key,
-    code: eventLike.code || "",
-    ctrlKey: Boolean(eventLike.ctrlKey),
-    altKey: Boolean(eventLike.altKey),
-    metaKey: Boolean(eventLike.metaKey),
-    shiftKey: Boolean(eventLike.shiftKey),
-    defaultPrevented: false,
-    propagationStopped: false,
-    preventDefault() {
-      this.defaultPrevented = true;
-      eventLike.preventDefault?.();
-    },
-    stopPropagation() {
-      this.propagationStopped = true;
-      eventLike.stopPropagation?.();
-    },
-  };
-
-  const vimPlugin = (cm as any).state?.vimPlugin;
-  let handled = false;
-  if (vimPlugin && typeof vimPlugin.handleKey === "function") {
-    handled = Boolean(vimPlugin.handleKey(mockEvent, view));
-  } else {
-    // Fallback direct to Vim.multiSelectHandleKey
-    const vim = (cm as any).state?.vim;
-    if (!vim) return false;
-    const keyName = (Vim as any).vimKeyFromEvent(mockEvent, vim);
-    if (!keyName) return false;
-    handled = Boolean((Vim as any).multiSelectHandleKey(cm, keyName, "user"));
+  let keyName = eventLike.key;
+  if (eventLike.ctrlKey && !eventLike.altKey && !eventLike.metaKey) {
+    if (keyName === "[") keyName = "<C-[>";
+    else if (keyName === "]") keyName = "<C-]>";
+    else keyName = `<C-${keyName.toLowerCase()}>`;
+  } else if (eventLike.key === "Escape") {
+    keyName = "<Esc>";
+  } else if (eventLike.key === "Enter") {
+    keyName = "<CR>";
+  } else if (eventLike.key === "Backspace") {
+    keyName = "<BS>";
+  } else if (eventLike.key === "Delete") {
+    keyName = "<Del>";
+  } else if (eventLike.key === "Tab") {
+    keyName = "<Tab>";
   }
+
+  let handled = false;
+  try {
+    handled = Boolean((Vim as any).multiSelectHandleKey(cm, keyName, "user"));
+  } catch (err) {
+    console.error("Vim key dispatch error:", err);
+  }
+
+  const vim = (cm as any).state?.vim;
+
+  try {
+    if (vim) {
+      if (vim.insertMode) {
+        vim.mode = vim.mode === "replace" ? "replace" : "insert";
+      } else if (vim.visualMode) {
+        vim.mode = "visual";
+      } else {
+        vim.mode = "normal";
+      }
+    }
+    const vimPlugin = (cm as any).state?.vimPlugin;
+    vimPlugin?.updateStatus?.();
+    vimPlugin?.blockCursor?.scheduleRedraw?.();
+  } catch {}
 
   persistVimSession();
   return handled;
@@ -278,8 +287,11 @@ export function attachVimImeProxy(
 
     const companionState = vimCompanion.getInputState();
 
-    // 1. In normal-pending: ALL printable keys are blocked completely to prevent race conditions
-    if (companionState === "normal-pending") {
+    // 1. In normal-pending: ALL printable keys are blocked completely when Companion is available
+    if (
+      companionState === "normal-pending" &&
+      vimCompanion.getAvailability() === "available"
+    ) {
       if (
         e.key.length === 1 &&
         !e.ctrlKey &&

@@ -3,14 +3,14 @@ import { renderHook } from "@testing-library/react";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 describe("useKeyboardShortcuts hook", () => {
-  it("triggers onSave on Ctrl+Alt+S and prevents default", () => {
+  it("triggers onSave on Ctrl+Shift+S and prevents default", () => {
     const onSave = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onSave }));
 
     const event = new KeyboardEvent("keydown", {
       key: "s",
       ctrlKey: true,
-      altKey: true,
+      shiftKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -20,14 +20,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onOpenSettings on Ctrl+Alt+, and prevents default", () => {
+  it("triggers onOpenSettings on Ctrl+Shift+, and prevents default", () => {
     const onOpenSettings = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onOpenSettings }));
 
     const event = new KeyboardEvent("keydown", {
       key: ",",
       ctrlKey: true,
-      altKey: true,
+      shiftKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -37,14 +37,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onToggleSidebar on Ctrl+Alt+B and prevents default", () => {
+  it("triggers onToggleSidebar on Ctrl+Shift+B and prevents default", () => {
     const onToggleSidebar = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onToggleSidebar }));
 
     const event = new KeyboardEvent("keydown", {
       key: "b",
       ctrlKey: true,
-      altKey: true,
+      shiftKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -54,14 +54,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onSearch on Ctrl+Alt+F and prevents default", () => {
+  it("triggers onSearch on Ctrl+Shift+F and prevents default", () => {
     const onSearch = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onSearch }));
 
     const event = new KeyboardEvent("keydown", {
       key: "f",
       ctrlKey: true,
-      altKey: true,
+      shiftKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -71,14 +71,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onQuickOpen on Ctrl+Alt+P (App-owned shortcut) and prevents default", () => {
+  it("triggers onQuickOpen on Ctrl+Shift+P (App-owned shortcut) and prevents default", () => {
     const onQuickOpen = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onQuickOpen }));
 
     const event = new KeyboardEvent("keydown", {
       key: "p",
       ctrlKey: true,
-      altKey: true,
+      shiftKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -88,14 +88,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onNewNote on Ctrl+Alt+N (App-owned shortcut) and prevents default", () => {
+  it("triggers onNewNote on Ctrl+Shift+N (App-owned shortcut) and prevents default", () => {
     const onNewNote = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onNewNote }));
 
     const event = new KeyboardEvent("keydown", {
       key: "n",
       ctrlKey: true,
-      altKey: true,
+      shiftKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -105,7 +105,7 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("does NOT intercept plain Ctrl+B, Ctrl+P, Ctrl+N, Ctrl+F, Ctrl+S without Alt", () => {
+  it("does NOT intercept plain Ctrl+B, Ctrl+P, Ctrl+N, Ctrl+F, Ctrl+S without Shift", () => {
     const onToggleSidebar = vi.fn();
     const onSearch = vi.fn();
     const onSave = vi.fn();
@@ -124,7 +124,7 @@ describe("useKeyboardShortcuts hook", () => {
     const ctrlB = new KeyboardEvent("keydown", {
       key: "b",
       ctrlKey: true,
-      altKey: false,
+      shiftKey: false,
       bubbles: true,
       cancelable: true,
     });
@@ -134,7 +134,7 @@ describe("useKeyboardShortcuts hook", () => {
     const ctrlP = new KeyboardEvent("keydown", {
       key: "p",
       ctrlKey: true,
-      altKey: false,
+      shiftKey: false,
       bubbles: true,
       cancelable: true,
     });
@@ -144,7 +144,7 @@ describe("useKeyboardShortcuts hook", () => {
     const ctrlS = new KeyboardEvent("keydown", {
       key: "s",
       ctrlKey: true,
-      altKey: false,
+      shiftKey: false,
       bubbles: true,
       cancelable: true,
     });

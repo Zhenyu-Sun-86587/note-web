@@ -48,7 +48,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       <div className="topbar-left">
         <IconButton
           icon={<PanelLeft size={18} />}
-          label={sidebarOpen ? "隐藏侧边栏 (Ctrl+Alt+B)" : "显示侧边栏 (Ctrl+Alt+B)"}
+          label={sidebarOpen ? "隐藏侧边栏 (Ctrl+Shift+B)" : "显示侧边栏 (Ctrl+Shift+B)"}
           onClick={onToggleSidebar}
           size="sm"
         />
@@ -89,7 +89,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               onClick={onSave}
               disabled={!canSave}
               className="save-button"
-              title="保存 (Ctrl+Alt+S)"
+              title="保存 (Ctrl+Shift+S)"
             >
               <Save size={14} style={{ marginRight: 4 }} />
               保存

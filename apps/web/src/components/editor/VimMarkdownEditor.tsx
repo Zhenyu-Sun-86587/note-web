@@ -180,7 +180,6 @@ export const VimMarkdownEditor = forwardRef<
 
     const lineNumberCompartment = useRef(new Compartment()).current;
     const lineWrappingCompartment = useRef(new Compartment()).current;
-    const vimEditableCompartment = useRef(new Compartment()).current;
     const proxyRef = useRef<HTMLTextAreaElement>(null);
 
     const [companionState, setCompanionState] = useState<VimNativeInputState>(
@@ -273,13 +272,14 @@ export const VimMarkdownEditor = forwardRef<
       const currentCm = getCM(viewRef.current);
       const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
       const compState = vimCompanion.getInputState();
-      const shouldBeEditable = isInsertOrReplace || compState === "normal-ready";
-
-      viewRef.current.dispatch({
-        effects: vimEditableCompartment.reconfigure(
-          EditorView.editable.of(shouldBeEditable),
-        ),
-      });
+      const contentDOM = viewRef.current.contentDOM;
+      if (contentDOM) {
+        const shouldBeEditable = isInsertOrReplace || compState === "normal-ready";
+        contentDOM.setAttribute(
+          "contenteditable",
+          shouldBeEditable ? "true" : "false",
+        );
+      }
     };
 
     // Subscribe to Companion state changes to immediately route focus when ASCII ready
@@ -465,13 +465,9 @@ export const VimMarkdownEditor = forwardRef<
         ]),
       ];
 
-      const initialCompState = vimCompanion.getInputState();
-      const initialEditable = initialCompState === "normal-ready";
-
       const view = new EditorView({
         doc: value,
         extensions: [
-          vimEditableCompartment.of(EditorView.editable.of(initialEditable)),
           vimDomHandlers,
           vim({ status: true }),
           lineNumberCompartment.of(
@@ -510,8 +506,10 @@ export const VimMarkdownEditor = forwardRef<
           vimCompanion.switchToCommandInput();
         }
 
-        updateEditableState();
-        syncFocus();
+        queueMicrotask(() => {
+          updateEditableState();
+          syncFocus();
+        });
       };
       (cm as any)?.on?.("vim-mode-change", handleModeChange);
 

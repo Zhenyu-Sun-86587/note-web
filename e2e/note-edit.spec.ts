@@ -2242,7 +2242,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(imeStatus).toContainText("IME Auto");
   });
 
-  test("Unified keyboard ownership: normal-ready focuses CodeMirror, Vim owns Ctrl+R/F, Note Web owns Ctrl+Alt+P/N/S", async ({
+  test("Unified keyboard ownership: normal-ready focuses CodeMirror, Vim owns Ctrl+R/F, Note Web owns Ctrl+Shift+P/N/S", async ({
     page,
   }) => {
     // 1. Mock Companion Extension to simulate normal-ready (IME Auto)
@@ -2314,21 +2314,28 @@ test.describe("Note Web E2E Suite", () => {
     expect(activeIsCodeMirror).toBe(true);
 
     // 3. Test Vim editing and Ctrl+R (Vim-owned Redo):
-    await page.keyboard.press("c");
-    await page.keyboard.press("i");
-    await page.keyboard.press("w");
-    await page.keyboard.type("replacedtoken");
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("firstword secondword thirdword");
     await page.keyboard.press("Escape");
     await expect(vimPanel).toContainText("NORMAL");
-    await expect(cmContent).toContainText("replacedtoken");
+    await expect(cmContent).toContainText("firstword secondword thirdword");
+
+    // dw to delete word
+    await page.keyboard.press("0");
+    await page.keyboard.press("d");
+    await page.keyboard.press("w");
+    await expect(cmContent).not.toContainText("firstword");
+    await expect(cmContent).toContainText("secondword thirdword");
 
     // Undo with u
     await page.keyboard.press("u");
-    await expect(cmContent).not.toContainText("replacedtoken");
+    await expect(cmContent).toContainText("firstword");
 
     // Redo with Control+r (Vim-owned Redo)
     await page.keyboard.press("Control+r");
-    await expect(cmContent).toContainText("replacedtoken");
+    await expect(cmContent).not.toContainText("firstword");
+    await expect(cmContent).toContainText("secondword thirdword");
 
     // Verify page did NOT reload (session marker intact)
     const marker = await page.evaluate(() => (window as any).__e2e_page_marker);
@@ -2338,8 +2345,8 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("Control+f");
     await expect(vimPanel).toContainText("NORMAL");
 
-    // 6. Test Ctrl+Alt+P (Note Web-owned Quick Open):
-    await page.keyboard.press("Control+Alt+p");
+    // 6. Test Ctrl+Shift+P (Note Web-owned Quick Open):
+    await page.keyboard.press("Control+Shift+p");
     const quickOpenDialog = page.getByRole("dialog");
     await expect(quickOpenDialog).toBeVisible();
     const printCalls = await page.evaluate(
@@ -2351,15 +2358,15 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("Escape");
     await expect(quickOpenDialog).not.toBeVisible();
 
-    // 7. Test Ctrl+Alt+N (Note Web-owned New Note):
-    await page.keyboard.press("Control+Alt+n");
+    // 7. Test Ctrl+Shift+N (Note Web-owned New Note):
+    await page.keyboard.press("Control+Shift+n");
     const newNoteDialog = page.getByRole("dialog");
     await expect(newNoteDialog).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(newNoteDialog).not.toBeVisible();
 
-    // 8. Test Ctrl+Alt+S (Note Web-owned Save):
-    await page.keyboard.press("Control+Alt+s");
+    // 8. Test Ctrl+Shift+S (Note Web-owned Save):
+    await page.keyboard.press("Control+Shift+s");
     const statusBar = page.locator(".statusbar");
     await expect(statusBar).toContainText("已保存", { timeout: 8000 });
   });

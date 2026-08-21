@@ -105,7 +105,7 @@ export class VimCompanionService {
     }
   }
 
-  public checkAvailability(timeoutMs = 400): Promise<boolean> {
+  public checkAvailability(timeoutMs = 80): Promise<boolean> {
     if (typeof window === "undefined") {
       this.availability = "unavailable";
       this.inputState = "unavailable";
@@ -167,13 +167,15 @@ export class VimCompanionService {
   }
 
   private notify() {
-    for (const listener of this.listeners) {
-      try {
-        listener();
-      } catch {
-        // Ignore subscriber errors
+    queueMicrotask(() => {
+      for (const listener of this.listeners) {
+        try {
+          listener();
+        } catch {
+          // Ignore subscriber errors
+        }
       }
-    }
+    });
   }
 
   private staleSwitchResult(
@@ -203,14 +205,17 @@ export class VimCompanionService {
 
     // 2. Reconnect probe await guard (probe without entering normal-pending)
     if (wasUnavailableOrError) {
-      const probeAvailable = await this.checkAvailability(400);
+      if (this.inputState !== "insert") {
+        this.inputState = this.availability === "error" ? "error" : "unavailable";
+      }
+      const probeAvailable = await this.checkAvailability(150);
       if (epoch !== this.inputIntentEpoch) {
         return this.staleSwitchResult();
       }
       if (!probeAvailable) {
         // Keep fallback state; do not transiently enter normal-pending
         if (this.inputState !== "insert") {
-          this.inputState = "unavailable";
+          this.inputState = this.availability === "error" ? "error" : "unavailable";
           this.notify();
         }
         return { ok: false, fallback: true };
@@ -223,6 +228,10 @@ export class VimCompanionService {
 
     // If Companion is not available, return fallback
     if (this.availability !== "available") {
+      if (this.inputState !== "insert") {
+        this.inputState = this.availability === "error" ? "error" : "unavailable";
+        this.notify();
+      }
       return { ok: false, fallback: true };
     }
 

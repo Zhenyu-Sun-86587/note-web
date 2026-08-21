@@ -1,16 +1,16 @@
 /**
  * Note Web Application Shortcuts
  *
- * App-level shortcuts use Ctrl+Alt (or Cmd+Alt on macOS) to avoid collisions with
+ * App-level shortcuts use Ctrl+Shift (or Cmd+Shift on macOS) to avoid collisions with
  * browser defaults (Edge/Chrome) and Vim standard commands.
  */
 export const NOTE_WEB_APP_SHORTCUTS = [
-  { key: "s", ctrl: true, alt: true, desc: "Save note (Ctrl+Alt+S)" },
-  { key: "p", ctrl: true, alt: true, desc: "Quick Open (Ctrl+Alt+P)" },
-  { key: "n", ctrl: true, alt: true, desc: "New note (Ctrl+Alt+N)" },
-  { key: "f", ctrl: true, alt: true, desc: "Global search (Ctrl+Alt+F)" },
-  { key: "b", ctrl: true, alt: true, desc: "Toggle sidebar (Ctrl+Alt+B)" },
-  { key: ",", ctrl: true, alt: true, desc: "Settings (Ctrl+Alt+,)" },
+  { key: "s", ctrl: true, shift: true, desc: "Save note (Ctrl+Shift+S)" },
+  { key: "p", ctrl: true, shift: true, desc: "Quick Open (Ctrl+Shift+P)" },
+  { key: "n", ctrl: true, shift: true, desc: "New note (Ctrl+Shift+N)" },
+  { key: "f", ctrl: true, shift: true, desc: "Global search (Ctrl+Shift+F)" },
+  { key: "b", ctrl: true, shift: true, desc: "Toggle sidebar (Ctrl+Shift+B)" },
+  { key: ",", ctrl: true, shift: true, desc: "Settings (Ctrl+Shift+,)" },
 ] as const;
 
 export type AppAction =
@@ -22,7 +22,7 @@ export type AppAction =
   | "sidebar";
 
 /**
- * Checks if a keyboard event matches a Note Web App-owned shortcut (Ctrl+Alt+...).
+ * Checks if a keyboard event matches a Note Web App-owned shortcut (Ctrl+Shift+...).
  */
 export function isAppOwnedShortcut(e: KeyboardEvent | {
   key: string;
@@ -30,14 +30,15 @@ export function isAppOwnedShortcut(e: KeyboardEvent | {
   metaKey?: boolean;
   shiftKey?: boolean;
   altKey?: boolean;
+  code?: string;
 }): AppAction | null {
   const isMac =
     typeof navigator !== "undefined" &&
     /Macintosh|Mac OS X/i.test(navigator.userAgent);
   const mod = isMac ? (e.metaKey || e.ctrlKey) : e.ctrlKey;
 
-  // App shortcuts strictly require Ctrl (or Cmd on Mac) + Alt
-  if (!mod || !e.altKey) {
+  // App shortcuts strictly require Ctrl (or Cmd on Mac) + Shift (and no Alt)
+  if (!mod || !e.shiftKey || e.altKey) {
     return null;
   }
 
@@ -47,7 +48,7 @@ export function isAppOwnedShortcut(e: KeyboardEvent | {
   if (key === "n") return "new-note";
   if (key === "f") return "search";
   if (key === "b") return "sidebar";
-  if (key === ",") return "settings";
+  if (key === "," || key === "<" || e.code === "Comma") return "settings";
 
   return null;
 }
