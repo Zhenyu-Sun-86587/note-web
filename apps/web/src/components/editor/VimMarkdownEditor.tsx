@@ -56,7 +56,6 @@ import {
   forwardKeyToVim,
 } from "../../utils/vim-ime";
 import {
-  setupVimKeymaps,
   isVimOwnedCtrlChord,
 } from "../../utils/vim-keyboard";
 import {
@@ -316,7 +315,6 @@ export const VimMarkdownEditor = forwardRef<
 
     // Initialize CodeMirror 6 EditorView with Vim
     useEffect(() => {
-      setupVimKeymaps();
       restoreVimSessionOnce();
       ensureExCommands();
       if (!containerRef.current) return;
@@ -512,10 +510,8 @@ export const VimMarkdownEditor = forwardRef<
           vimCompanion.switchToCommandInput();
         }
 
-        queueMicrotask(() => {
-          updateEditableState();
-          syncFocus();
-        });
+        updateEditableState();
+        syncFocus();
       };
       (cm as any)?.on?.("vim-mode-change", handleModeChange);
 

@@ -674,6 +674,7 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("i");
     await expect(vimPanel).toContainText("INSERT");
     await page.keyboard.type(" ImmediateVimText");
+    await expect(cmContent).toContainText("ImmediateVimText");
     await page.keyboard.press("Escape");
     await expect(vimPanel).toContainText("NORMAL");
 
@@ -2241,7 +2242,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(imeStatus).toContainText("IME Auto");
   });
 
-  test("Unified keyboard ownership: normal-ready focuses CodeMirror, Vim owns Ctrl+R/F, Note Web owns Ctrl+P/N/S", async ({
+  test("Unified keyboard ownership: normal-ready focuses CodeMirror, Vim owns Ctrl+R/F, Note Web owns Ctrl+Alt+P/N/S", async ({
     page,
   }) => {
     // 1. Mock Companion Extension to simulate normal-ready (IME Auto)
@@ -2337,9 +2338,8 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("Control+f");
     await expect(vimPanel).toContainText("NORMAL");
 
-    // 6. Test Ctrl+P (Note Web-owned Quick Open):
-    // Must open Quick Open modal and NOT trigger browser print (window.print)
-    await page.keyboard.press("Control+p");
+    // 6. Test Ctrl+Alt+P (Note Web-owned Quick Open):
+    await page.keyboard.press("Control+Alt+p");
     const quickOpenDialog = page.getByRole("dialog");
     await expect(quickOpenDialog).toBeVisible();
     const printCalls = await page.evaluate(
@@ -2351,15 +2351,15 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("Escape");
     await expect(quickOpenDialog).not.toBeVisible();
 
-    // 7. Test Ctrl+N (Note Web-owned New Note):
-    await page.keyboard.press("Control+n");
+    // 7. Test Ctrl+Alt+N (Note Web-owned New Note):
+    await page.keyboard.press("Control+Alt+n");
     const newNoteDialog = page.getByRole("dialog");
     await expect(newNoteDialog).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(newNoteDialog).not.toBeVisible();
 
-    // 8. Test Ctrl+S (Note Web-owned Save):
-    await page.keyboard.press("Control+s");
+    // 8. Test Ctrl+Alt+S (Note Web-owned Save):
+    await page.keyboard.press("Control+Alt+s");
     const statusBar = page.locator(".statusbar");
     await expect(statusBar).toContainText("已保存", { timeout: 8000 });
   });

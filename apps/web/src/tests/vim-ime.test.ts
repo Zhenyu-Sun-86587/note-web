@@ -49,10 +49,10 @@ describe("Vim IME Isolation Utilities", () => {
       expect(isVimOwnedCtrlChord({ key: "]", code: "BracketRight", ctrlKey: true })).toBe(true);
     });
 
-    it("does not treat App-owned shortcuts (Ctrl+S, Ctrl+P, Ctrl+N) as generic Vim Ctrl chords", () => {
-      expect(isAppOwnedShortcut({ key: "s", ctrlKey: true })).toBe("save");
-      expect(isAppOwnedShortcut({ key: "p", ctrlKey: true })).toBe("quick-open");
-      expect(isAppOwnedShortcut({ key: "n", ctrlKey: true })).toBe("new-note");
+    it("does not treat App-owned shortcuts (Ctrl+Alt+S, Ctrl+Alt+P, Ctrl+Alt+N) as generic Vim Ctrl chords", () => {
+      expect(isAppOwnedShortcut({ key: "s", ctrlKey: true, altKey: true })).toBe("save");
+      expect(isAppOwnedShortcut({ key: "p", ctrlKey: true, altKey: true })).toBe("quick-open");
+      expect(isAppOwnedShortcut({ key: "n", ctrlKey: true, altKey: true })).toBe("new-note");
     });
   });
 
@@ -149,11 +149,12 @@ describe("Vim IME Isolation Utilities", () => {
         expect(stopped).toBe(true);
       }
 
-      // Test Ctrl+S triggers onSave
+      // Test Ctrl+Alt+S triggers onSave
       let savePrevented = false;
       const saveEvent = new KeyboardEvent("keydown", {
         key: "s",
         ctrlKey: true,
+        altKey: true,
         bubbles: true,
         cancelable: true,
       });

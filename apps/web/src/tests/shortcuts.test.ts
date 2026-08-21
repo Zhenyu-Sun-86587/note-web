@@ -3,13 +3,14 @@ import { renderHook } from "@testing-library/react";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 describe("useKeyboardShortcuts hook", () => {
-  it("triggers onSave on Ctrl+S and prevents default", () => {
+  it("triggers onSave on Ctrl+Alt+S and prevents default", () => {
     const onSave = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onSave }));
 
     const event = new KeyboardEvent("keydown", {
       key: "s",
       ctrlKey: true,
+      altKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -19,13 +20,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onOpenSettings on Ctrl+, and prevents default", () => {
+  it("triggers onOpenSettings on Ctrl+Alt+, and prevents default", () => {
     const onOpenSettings = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onOpenSettings }));
 
     const event = new KeyboardEvent("keydown", {
       key: ",",
       ctrlKey: true,
+      altKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -35,14 +37,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onToggleSidebar on Ctrl+Shift+B and prevents default", () => {
+  it("triggers onToggleSidebar on Ctrl+Alt+B and prevents default", () => {
     const onToggleSidebar = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onToggleSidebar }));
 
     const event = new KeyboardEvent("keydown", {
-      key: "B",
+      key: "b",
       ctrlKey: true,
-      shiftKey: true,
+      altKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -52,14 +54,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onSearch on Ctrl+Shift+F and prevents default", () => {
+  it("triggers onSearch on Ctrl+Alt+F and prevents default", () => {
     const onSearch = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onSearch }));
 
     const event = new KeyboardEvent("keydown", {
-      key: "F",
+      key: "f",
       ctrlKey: true,
-      shiftKey: true,
+      altKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -69,13 +71,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onQuickOpen on Ctrl+P (App-owned shortcut) and prevents default", () => {
+  it("triggers onQuickOpen on Ctrl+Alt+P (App-owned shortcut) and prevents default", () => {
     const onQuickOpen = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onQuickOpen }));
 
     const event = new KeyboardEvent("keydown", {
       key: "p",
       ctrlKey: true,
+      altKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -85,13 +88,14 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("triggers onNewNote on Ctrl+N (App-owned shortcut) and prevents default", () => {
+  it("triggers onNewNote on Ctrl+Alt+N (App-owned shortcut) and prevents default", () => {
     const onNewNote = vi.fn();
     renderHook(() => useKeyboardShortcuts({ onNewNote }));
 
     const event = new KeyboardEvent("keydown", {
       key: "n",
       ctrlKey: true,
+      altKey: true,
       bubbles: true,
       cancelable: true,
     });
@@ -101,30 +105,51 @@ describe("useKeyboardShortcuts hook", () => {
     expect(prevented).toBe(true);
   });
 
-  it("does NOT intercept Ctrl+B or Ctrl+K without Shift so editor formatting hotkeys work", () => {
+  it("does NOT intercept plain Ctrl+B, Ctrl+P, Ctrl+N, Ctrl+F, Ctrl+S without Alt", () => {
     const onToggleSidebar = vi.fn();
     const onSearch = vi.fn();
-    renderHook(() => useKeyboardShortcuts({ onToggleSidebar, onSearch }));
+    const onSave = vi.fn();
+    const onQuickOpen = vi.fn();
+    const onNewNote = vi.fn();
+    renderHook(() =>
+      useKeyboardShortcuts({
+        onToggleSidebar,
+        onSearch,
+        onSave,
+        onQuickOpen,
+        onNewNote,
+      }),
+    );
 
     const ctrlB = new KeyboardEvent("keydown", {
       key: "b",
       ctrlKey: true,
-      shiftKey: false,
+      altKey: false,
       bubbles: true,
       cancelable: true,
     });
     window.dispatchEvent(ctrlB);
     expect(onToggleSidebar).not.toHaveBeenCalled();
 
-    const ctrlK = new KeyboardEvent("keydown", {
-      key: "k",
+    const ctrlP = new KeyboardEvent("keydown", {
+      key: "p",
       ctrlKey: true,
-      shiftKey: false,
+      altKey: false,
       bubbles: true,
       cancelable: true,
     });
-    window.dispatchEvent(ctrlK);
-    expect(onSearch).not.toHaveBeenCalled();
+    window.dispatchEvent(ctrlP);
+    expect(onQuickOpen).not.toHaveBeenCalled();
+
+    const ctrlS = new KeyboardEvent("keydown", {
+      key: "s",
+      ctrlKey: true,
+      altKey: false,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(ctrlS);
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it("handles Escape in modal dialogs while leaving editor Escape alone", () => {

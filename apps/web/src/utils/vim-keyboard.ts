@@ -1,48 +1,28 @@
-import { Vim } from "@replit/codemirror-vim";
-
 /**
- * Shortcuts owned by Note Web application rather than Vim.
- * In Normal mode, these should trigger App actions (Save, Quick Open, New Note, etc.)
- * rather than Vim motions/commands.
+ * Note Web Application Shortcuts
+ *
+ * App-level shortcuts use Ctrl+Alt (or Cmd+Alt on macOS) to avoid collisions with
+ * browser defaults (Edge/Chrome) and Vim standard commands.
  */
 export const NOTE_WEB_APP_SHORTCUTS = [
-  { key: "s", ctrl: true, desc: "Save note" },
-  { key: "p", ctrl: true, desc: "Quick Open" },
-  { key: "n", ctrl: true, desc: "New note" },
-  { key: ",", ctrl: true, desc: "Settings" },
-  { key: "f", ctrl: true, shift: true, desc: "Global search" },
-  { key: "b", ctrl: true, shift: true, desc: "Toggle sidebar" },
+  { key: "s", ctrl: true, alt: true, desc: "Save note (Ctrl+Alt+S)" },
+  { key: "p", ctrl: true, alt: true, desc: "Quick Open (Ctrl+Alt+P)" },
+  { key: "n", ctrl: true, alt: true, desc: "New note (Ctrl+Alt+N)" },
+  { key: "f", ctrl: true, alt: true, desc: "Global search (Ctrl+Alt+F)" },
+  { key: "b", ctrl: true, alt: true, desc: "Toggle sidebar (Ctrl+Alt+B)" },
+  { key: ",", ctrl: true, alt: true, desc: "Settings (Ctrl+Alt+,)" },
 ] as const;
 
-/**
- * Vim bindings to unmap from @replit/codemirror-vim so that CodeMirror lets
- * the event bubble up to the Note Web shortcut router.
- */
-export const APP_OWNED_VIM_UNMAPS = ["<C-p>", "<C-n>", "<C-s>"] as const;
-
-let vimKeymapsConfigured = false;
-
-/**
- * Configures Vim keymaps by unmapping Note Web-owned bindings.
- * Called during Vim editor initialization or module load.
- */
-export function setupVimKeymaps() {
-  if (vimKeymapsConfigured) return;
-
-  const contexts = ["normal", "insert", "visual", "operator"];
-  for (const binding of APP_OWNED_VIM_UNMAPS) {
-    for (const ctx of contexts) {
-      try {
-        Vim.unmap(binding, ctx);
-      } catch {}
-    }
-  }
-
-  vimKeymapsConfigured = true;
-}
+export type AppAction =
+  | "save"
+  | "quick-open"
+  | "new-note"
+  | "settings"
+  | "search"
+  | "sidebar";
 
 /**
- * Helper to check if an event matches a Note Web App-owned shortcut.
+ * Checks if a keyboard event matches a Note Web App-owned shortcut (Ctrl+Alt+...).
  */
 export function isAppOwnedShortcut(e: KeyboardEvent | {
   key: string;
@@ -50,33 +30,30 @@ export function isAppOwnedShortcut(e: KeyboardEvent | {
   metaKey?: boolean;
   shiftKey?: boolean;
   altKey?: boolean;
-}): "save" | "quick-open" | "new-note" | "settings" | "search" | "sidebar" | null {
+}): AppAction | null {
   const isMac =
     typeof navigator !== "undefined" &&
     /Macintosh|Mac OS X/i.test(navigator.userAgent);
-  const mod = isMac ? e.metaKey : e.ctrlKey;
-  if (!mod || e.altKey) return null;
+  const mod = isMac ? (e.metaKey || e.ctrlKey) : e.ctrlKey;
+
+  // App shortcuts strictly require Ctrl (or Cmd on Mac) + Alt
+  if (!mod || !e.altKey) {
+    return null;
+  }
 
   const key = e.key.toLowerCase();
-
-  // Ctrl/Cmd + Shift + F -> Search
-  if (e.shiftKey && key === "f") return "search";
-  // Ctrl/Cmd + Shift + B -> Sidebar
-  if (e.shiftKey && key === "b") return "sidebar";
-
-  // Shortcuts requiring shiftKey === false
-  if (!e.shiftKey) {
-    if (key === "s") return "save";
-    if (key === "p") return "quick-open";
-    if (key === "n") return "new-note";
-    if (key === ",") return "settings";
-  }
+  if (key === "s") return "save";
+  if (key === "p") return "quick-open";
+  if (key === "n") return "new-note";
+  if (key === "f") return "search";
+  if (key === "b") return "sidebar";
+  if (key === ",") return "settings";
 
   return null;
 }
 
 /**
- * Vim-owned standard Ctrl chords that must be preserved for Vim in normal/visual mode.
+ * Standard Vim Ctrl keys in Normal/Visual mode.
  */
 export const VIM_OWNED_CTRL_KEYS = new Set([
   "r", // Redo
@@ -85,7 +62,7 @@ export const VIM_OWNED_CTRL_KEYS = new Set([
   "d", // Half Page Down
   "u", // Half Page Up
   "o", // Jump older
-  "i", // Jump newer (in Normal mode)
+  "i", // Jump newer
   "w", // Window command prefix (Ctrl+W)
   "a", // Increment number
   "x", // Decrement number
@@ -105,6 +82,9 @@ export const VIM_OWNED_CTRL_KEYS = new Set([
   "q", // Visual block / command
 ]);
 
+/**
+ * Checks if an event is a Vim-owned standard Ctrl chord (without Alt).
+ */
 export function isVimOwnedCtrlChord(e: {
   key: string;
   ctrlKey?: boolean;
