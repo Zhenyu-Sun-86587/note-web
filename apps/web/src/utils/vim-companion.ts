@@ -188,10 +188,8 @@ export class VimCompanionService {
   }
 
   public async switchToCommandInput(timeoutMs = 500): Promise<CompanionSwitchResult> {
-    // P0-A: Intent Epoch and normal-pending established immediately before any await
+    // Principle A: Intent Epoch is established immediately before any await
     const epoch = ++this.inputIntentEpoch;
-    this.inputState = "normal-pending";
-    this.notify();
 
     // 1. Initial checking await guard
     if (this.availability === "checking" && this.checkPromise) {
@@ -201,18 +199,29 @@ export class VimCompanionService {
       }
     }
 
-    // 2. Reconnect probe await guard
+    // 2. Reconnect probe await guard (probe without entering normal-pending)
     if (this.availability === "unavailable" || this.availability === "error") {
-      const probeAvailable = await this.checkAvailability(60);
+      const probeAvailable = await this.checkAvailability(400);
       if (epoch !== this.inputIntentEpoch) {
         return this.staleSwitchResult();
       }
       if (!probeAvailable) {
-        this.inputState = "unavailable";
-        this.notify();
+        // Keep fallback state; do not transiently enter normal-pending
+        if (this.inputState !== "insert") {
+          this.inputState = "unavailable";
+          this.notify();
+        }
         return { ok: false, fallback: true };
       }
     }
+
+    if (epoch !== this.inputIntentEpoch) {
+      return this.staleSwitchResult();
+    }
+
+    // Principle B: Actual Native switch begins only here once companion is available
+    this.inputState = "normal-pending";
+    this.notify();
 
     // 3. Switch request
     const id = `switch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;

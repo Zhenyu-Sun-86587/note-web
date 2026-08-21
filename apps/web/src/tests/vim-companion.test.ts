@@ -39,8 +39,9 @@ describe("VimCompanionService and State Machine", () => {
     service._mockSetAvailability("unavailable");
     service._mockSetInputState("unavailable");
 
-    // Call switchToCommandInput when unavailable -> triggers checkAvailability probe
+    // Call switchToCommandInput when unavailable -> triggers checkAvailability probe without normal-pending
     const switchPromise = service.switchToCommandInput(500);
+    expect(service.getInputState()).toBe("unavailable");
 
     // Get the ping request id and reply success
     const pingIds = service._mockGetPendingRequestIds();
@@ -51,8 +52,9 @@ describe("VimCompanionService and State Machine", () => {
       action: "ping",
     });
 
-    // Advance microtasks for probe resolution and switch_ascii dispatch
+    // Advance microtasks for probe resolution -> now enters normal-pending and dispatches switch_ascii
     await vi.advanceTimersByTimeAsync(10);
+    expect(service.getInputState()).toBe("normal-pending");
 
     // Get the switch request id and reply verified success
     const switchIds = service._mockGetPendingRequestIds();
@@ -80,9 +82,9 @@ describe("VimCompanionService and State Machine", () => {
     service._mockSetAvailability("unavailable");
     service._mockSetInputState("unavailable");
 
-    // 1. Call switchToCommandInput when unavailable -> state immediately normal-pending, ping in-flight
+    // 1. Call switchToCommandInput when unavailable -> state stays unavailable/fallback, ping in-flight
     const switchPromise = service.switchToCommandInput(500);
-    expect(service.getInputState()).toBe("normal-pending");
+    expect(service.getInputState()).toBe("unavailable");
 
     const pingIds = service._mockGetPendingRequestIds();
     expect(pingIds.length).toBe(1);
@@ -125,7 +127,7 @@ describe("VimCompanionService and State Machine", () => {
 
     // While checking is in-flight, switchToCommandInput is called
     const switchPromise = service.switchToCommandInput(500);
-    expect(service.getInputState()).toBe("normal-pending");
+    expect(service.getInputState()).toBe("unavailable");
 
     // User enters Insert mode before check resolves
     service.restoreTextInput();
@@ -158,20 +160,37 @@ describe("VimCompanionService and State Machine", () => {
     service._mockSetInputState("unavailable");
 
     const switchPromise = service.switchToCommandInput(500);
-    expect(service.getInputState()).toBe("normal-pending");
+    expect(service.getInputState()).toBe("unavailable");
 
     // User enters Insert mode
     service.restoreTextInput();
     expect(service.getInputState()).toBe("insert");
 
-    // Advance timer to let probe ping time out (60ms)
-    await vi.advanceTimersByTimeAsync(100);
+    // Advance timer to let probe ping time out (400ms)
+    await vi.advanceTimersByTimeAsync(450);
 
     const result = await switchPromise;
     expect(result.code).toBe("STALE_OPERATION");
 
     // State must NOT be overwritten with "unavailable" or "error"!
     expect(service.getInputState()).toBe("insert");
+  });
+
+  it("Reconnect probe timeout maintains fallback state when user intent does not change", async () => {
+    const service = VimCompanionService.getInstance();
+    service._mockSetAvailability("unavailable");
+    service._mockSetInputState("unavailable");
+
+    const switchPromise = service.switchToCommandInput(500);
+    expect(service.getInputState()).toBe("unavailable");
+
+    // Advance timer to let probe ping time out (400ms)
+    await vi.advanceTimersByTimeAsync(450);
+
+    const result = await switchPromise;
+    expect(result.ok).toBe(false);
+    expect(result.fallback).toBe(true);
+    expect(service.getInputState()).toBe("unavailable");
   });
 
   it("P0-B: isRestoreReleased strictly requires verified release and rejects NATIVE_HOST_DISCONNECTED", () => {

@@ -671,7 +671,6 @@ test.describe("Note Web E2E Suite", () => {
     // 2. Type in VIM (in Insert mode) and immediately switch to IR
     const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
     await cmContent.click();
-    await page.waitForTimeout(350);
     await page.keyboard.press("i");
     await expect(vimPanel).toContainText("INSERT");
     await page.keyboard.type(" ImmediateVimText");
@@ -705,7 +704,6 @@ test.describe("Note Web E2E Suite", () => {
 
     // Focus editor and verify NORMAL mode
     await cmContent.click();
-    await page.waitForTimeout(350);
     await expect(vimPanel).toContainText("NORMAL");
 
     // Insert a test line
@@ -713,7 +711,6 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("o");
     await page.keyboard.type("firstword secondword thirdword");
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
     await expect(vimPanel).toContainText("NORMAL");
     await expect(cmContent).toContainText("firstword secondword thirdword");
 
@@ -1519,7 +1516,6 @@ test.describe("Note Web E2E Suite", () => {
     const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
     await expect(cmContent).toBeVisible();
     await cmContent.click();
-    await page.waitForTimeout(200);
 
     // 3. Press i, type text, then type jj
     await page.keyboard.press("i");
@@ -1547,7 +1543,6 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
 
     // Go to top and set mark 'a'
     await page.keyboard.press("g");
@@ -1585,7 +1580,6 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
 
     // 1. Yank first line into register 'a': "ayy
     await page.keyboard.press("g");
@@ -1628,7 +1622,6 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
 
     // 1. Insert 4 new sample lines: itemalpha, itembeta, itemgamma, itemdelta
     await page.keyboard.press("G");
@@ -1641,7 +1634,6 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("Enter");
     await page.keyboard.type("itemdelta");
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
 
     // 2. Move cursor up to itemalpha: 3k
     await page.keyboard.press("3");
@@ -1653,7 +1645,6 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("I");
     await page.keyboard.type("- ");
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
     await page.keyboard.press("j");
     await page.keyboard.press("q");
 
@@ -1688,7 +1679,6 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
 
     // 1. Record macro 'a' with Backspace: qa i abc <Backspace> d <Escape> q -> inserts "abd"
     await page.keyboard.press("G");
