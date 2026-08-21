@@ -75,6 +75,7 @@ export interface VimMarkdownEditorProps {
   vimLineWrapping?: boolean;
   vimJjEscape?: boolean;
   onCursorActivity?: (line: number) => void;
+  onScroll?: (scrollTop: number, topSourceLine: number) => void;
 }
 
 // Global active instance tracker for Ex commands
@@ -165,6 +166,7 @@ export const VimMarkdownEditor = forwardRef<
       vimLineWrapping = true,
       vimJjEscape = false,
       onCursorActivity,
+      onScroll,
     },
     ref,
   ) => {
@@ -181,6 +183,8 @@ export const VimMarkdownEditor = forwardRef<
     onToggleZenRef.current = onToggleZen;
     const onCursorActivityRef = useRef(onCursorActivity);
     onCursorActivityRef.current = onCursorActivity;
+    const onScrollRef = useRef(onScroll);
+    onScrollRef.current = onScroll;
 
     const lineNumberCompartment = useRef(new Compartment()).current;
     const lineWrappingCompartment = useRef(new Compartment()).current;
@@ -339,6 +343,23 @@ export const VimMarkdownEditor = forwardRef<
             viewRef.current.focus();
             syncFocus();
           }
+        },
+        scrollViewportToLine: (line: number) => {
+          if (viewRef.current) {
+            const totalLines = viewRef.current.state.doc.lines;
+            const targetLine = Math.max(1, Math.min(line, totalLines));
+            const lineObj = viewRef.current.state.doc.line(targetLine);
+            const lineBlock = viewRef.current.lineBlockAt(lineObj.from);
+            viewRef.current.scrollDOM.scrollTop = lineBlock.top;
+          }
+        },
+        getVisibleTopLine: () => {
+          if (viewRef.current) {
+            const scrollTop = viewRef.current.scrollDOM.scrollTop;
+            const lineBlock = viewRef.current.lineBlockAtHeight(scrollTop);
+            return viewRef.current.state.doc.lineAt(lineBlock.from).number;
+          }
+          return 1;
         },
         getCursorLine: () => {
           if (viewRef.current) {
@@ -625,12 +646,22 @@ export const VimMarkdownEditor = forwardRef<
       document.addEventListener("visibilitychange", handleVisibilityOrFocus);
       window.addEventListener("focus", handleVisibilityOrFocus);
 
+      const handleScrollDOM = () => {
+        if (!viewRef.current) return;
+        const scrollTop = viewRef.current.scrollDOM.scrollTop;
+        const lineBlock = viewRef.current.lineBlockAtHeight(scrollTop);
+        const topSourceLine = viewRef.current.state.doc.lineAt(lineBlock.from).number;
+        onScrollRef.current?.(scrollTop, topSourceLine);
+      };
+      view.scrollDOM.addEventListener("scroll", handleScrollDOM, { passive: true });
+
       queueMicrotask(() => {
         updateEditableState();
         syncFocus();
       });
 
       return () => {
+        view.scrollDOM.removeEventListener("scroll", handleScrollDOM);
         vimCompanion.restoreTextInput();
         document.removeEventListener("focusin", handleFocusIn);
         document.removeEventListener("focusout", handleFocusOut);

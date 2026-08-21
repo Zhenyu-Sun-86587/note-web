@@ -77,7 +77,7 @@ function isTableSeparator(line: string): boolean {
 }
 
 /**
- * Renders full Markdown document into HTML.
+ * Renders full Markdown document into HTML with source-line metadata for bidirectional sync scroll.
  */
 export function renderMarkdown(markdown: string, notePath: string): string {
   if (!markdown || !markdown.trim()) {
@@ -99,22 +99,37 @@ export function renderMarkdown(markdown: string, notePath: string): string {
       continue;
     }
 
-    // 2. Fenced Code Block
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      const fence = trimmed.slice(0, 3);
-      const lang = trimmed.slice(3).trim();
+    // 2. Fenced Code Block (supporting ``` and ~~~ with matching character and length)
+    const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (fenceMatch) {
+      const startLine = i + 1;
+      const openingFence = fenceMatch[1];
+      const fenceChar = openingFence[0];
+      const fenceLen = openingFence.length;
+      const lang = fenceMatch[2].trim();
       const codeLines: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].trim().startsWith(fence)) {
-        codeLines.push(lines[i]);
+
+      while (i < lines.length) {
+        const curLine = lines[i];
+        const closeMatch = curLine.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+        if (
+          closeMatch &&
+          closeMatch[1][0] === fenceChar &&
+          closeMatch[1].length >= fenceLen &&
+          (fenceChar === "~" || !closeMatch[2].includes("`"))
+        ) {
+          i++; // consume closing fence
+          break;
+        }
+        codeLines.push(curLine);
         i++;
       }
-      if (i < lines.length) {
-        i++; // skip closing fence
-      }
+
+      const endLine = i;
       const codeContent = escapeHtml(codeLines.join("\n"));
       out.push(
-        `<pre><code class="${lang ? `language-${escapeHtml(lang)}` : ""}">${codeContent}</code></pre>`,
+        `<pre data-source-line="${startLine}" data-source-end-line="${endLine}"><code class="${lang ? `language-${escapeHtml(lang)}` : ""}">${codeContent}</code></pre>`,
       );
       continue;
     }
@@ -122,12 +137,13 @@ export function renderMarkdown(markdown: string, notePath: string): string {
     // 3. Headings
     const headingMatch = line.match(/^ {0,3}(#{1,6})\s+(.+)$/);
     if (headingMatch) {
+      const startLine = i + 1;
       const level = headingMatch[1].length;
       const text = headingMatch[2].replace(/\s+#+\s*$/, "").trim();
       headingCount++;
       const id = `heading-${headingCount}`;
       out.push(
-        `<h${level} id="${id}">${renderInline(escapeHtml(text), notePath)}</h${level}>`,
+        `<h${level} id="${id}" data-source-line="${startLine}">${renderInline(escapeHtml(text), notePath)}</h${level}>`,
       );
       i++;
       continue;
@@ -135,20 +151,25 @@ export function renderMarkdown(markdown: string, notePath: string): string {
 
     // 4. Horizontal Rule
     if (/^ {0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) {
-      out.push("<hr />");
+      const startLine = i + 1;
+      out.push(`<hr data-source-line="${startLine}" />`);
       i++;
       continue;
     }
 
     // 5. Blockquote
     if (trimmed.startsWith(">")) {
+      const startLine = i + 1;
       const quoteLines: string[] = [];
       while (i < lines.length && lines[i].trim().startsWith(">")) {
         quoteLines.push(lines[i].trim().replace(/^>\s?/, ""));
         i++;
       }
+      const endLine = i;
       const quoteHtml = renderMarkdown(quoteLines.join("\n"), notePath);
-      out.push(`<blockquote>${quoteHtml}</blockquote>`);
+      out.push(
+        `<blockquote data-source-line="${startLine}" data-source-end-line="${endLine}">${quoteHtml}</blockquote>`,
+      );
       continue;
     }
 
@@ -158,6 +179,7 @@ export function renderMarkdown(markdown: string, notePath: string): string {
       i + 1 < lines.length &&
       isTableSeparator(lines[i + 1])
     ) {
+      const startLine = i + 1;
       const headerLine = lines[i];
       const sepLine = lines[i + 1];
       const headerCells = headerLine
@@ -182,12 +204,17 @@ export function renderMarkdown(markdown: string, notePath: string): string {
 
       i += 2;
       const rowLines: string[] = [];
-      while (i < lines.length && lines[i].trim().includes("|") && !lines[i].trim().startsWith("#")) {
+      while (
+        i < lines.length &&
+        lines[i].trim().includes("|") &&
+        !lines[i].trim().startsWith("#")
+      ) {
         rowLines.push(lines[i]);
         i++;
       }
+      const endLine = i;
 
-      let tableHtml = "<table>\n<thead>\n<tr>\n";
+      let tableHtml = `<table data-source-line="${startLine}" data-source-end-line="${endLine}">\n<thead>\n<tr>\n`;
       headerCells.forEach((cell, idx) => {
         const align = alignments[idx] || "left";
         tableHtml += `  <th style="text-align: ${align}">${renderInline(escapeHtml(cell), notePath)}</th>\n`;
@@ -220,9 +247,10 @@ export function renderMarkdown(markdown: string, notePath: string): string {
     const olMatch = line.match(/^ {0,3}(\d+)\.\s+(.*)$/);
 
     if (ulMatch || olMatch) {
+      const startLine = i + 1;
       const isOrdered = Boolean(olMatch);
       const tag = isOrdered ? "ol" : "ul";
-      const listItems: string[] = [];
+      const listItems: { text: string; line: number }[] = [];
 
       while (i < lines.length) {
         const currentLine = lines[i];
@@ -230,26 +258,27 @@ export function renderMarkdown(markdown: string, notePath: string): string {
         const curOl = currentLine.match(/^ {0,3}(\d+)\.\s+(.*)$/);
 
         if (isOrdered && curOl) {
-          listItems.push(curOl[2]);
+          listItems.push({ text: curOl[2], line: i + 1 });
           i++;
         } else if (!isOrdered && curUl) {
-          listItems.push(curUl[2]);
+          listItems.push({ text: curUl[2], line: i + 1 });
           i++;
         } else {
           break;
         }
       }
+      const endLine = i;
 
-      let listHtml = `<${tag}>\n`;
-      for (const itemText of listItems) {
+      let listHtml = `<${tag} data-source-line="${startLine}" data-source-end-line="${endLine}">\n`;
+      for (const item of listItems) {
         // Task list item check: [ ] or [x]
-        const taskMatch = itemText.match(/^\[([ xX])\]\s*(.*)$/);
+        const taskMatch = item.text.match(/^\[([ xX])\]\s*(.*)$/);
         if (taskMatch) {
           const isChecked = taskMatch[1].toLowerCase() === "x";
           const itemContent = renderInline(escapeHtml(taskMatch[2]), notePath);
-          listHtml += `  <li class="task-list-item"><input type="checkbox" disabled ${isChecked ? 'checked="" ' : ""}/> ${itemContent}</li>\n`;
+          listHtml += `  <li class="task-list-item" data-source-line="${item.line}"><input type="checkbox" disabled ${isChecked ? 'checked="" ' : ""}/> ${itemContent}</li>\n`;
         } else {
-          listHtml += `  <li>${renderInline(escapeHtml(itemText), notePath)}</li>\n`;
+          listHtml += `  <li data-source-line="${item.line}">${renderInline(escapeHtml(item.text), notePath)}</li>\n`;
         }
       }
       listHtml += `</${tag}>`;
@@ -258,6 +287,7 @@ export function renderMarkdown(markdown: string, notePath: string): string {
     }
 
     // 8. Regular Paragraph
+    const startLine = i + 1;
     const paragraphLines: string[] = [];
     while (
       i < lines.length &&
@@ -272,12 +302,15 @@ export function renderMarkdown(markdown: string, notePath: string): string {
       paragraphLines.push(lines[i]);
       i++;
     }
+    const endLine = i;
 
     if (paragraphLines.length > 0) {
       const pContent = paragraphLines
         .map((l) => renderInline(escapeHtml(l), notePath))
         .join("<br />");
-      out.push(`<p>${pContent}</p>`);
+      out.push(
+        `<p data-source-line="${startLine}" data-source-end-line="${endLine}">${pContent}</p>`,
+      );
     }
   }
 

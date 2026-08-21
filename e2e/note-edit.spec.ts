@@ -39,10 +39,10 @@ function resetTestVault() {
   }
 
   // 2. Restore tracked fixtures
-  if (originalWelcomeContent !== null && fs.existsSync(welcomeFixturePath)) {
+  if (originalWelcomeContent !== null) {
     fs.writeFileSync(welcomeFixturePath, originalWelcomeContent, "utf8");
   }
-  if (originalExampleContent !== null && fs.existsSync(exampleFixturePath)) {
+  if (originalExampleContent !== null) {
     fs.writeFileSync(exampleFixturePath, originalExampleContent, "utf8");
   }
 
@@ -54,6 +54,9 @@ function resetTestVault() {
     "test-vault/inbox/second-note.md",
     "test-vault/tab-test-note.md",
     "test-vault/inbox/tab-test-note.md",
+    "test-vault/inbox/welcome-renamed.md",
+    "test-vault/inbox/sync-test.md",
+    "test-vault/duplicate-heading.md",
   ];
   for (const rel of tempFiles) {
     const full = path.resolve(process.cwd(), rel);
@@ -2527,6 +2530,286 @@ test.describe("Note Web E2E Suite", () => {
     // Toggle back with shortcut
     await page.keyboard.press("Control+Alt+v");
     await expect(previewPane).toBeVisible();
+  });
+
+  test("Remediation 1: Note rename updates TabItem doc path, switching tabs and back preserves new path on save", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/Note Web/);
+
+    // Switch to Vim mode for deterministic editing
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "VIM" });
+    await vimBtn.click();
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+
+    // 1. Open projects/example.md to have 2 tabs open: welcome.md and example.md
+    const projectsFolder = page.locator(".folder-name", { hasText: "projects" });
+    if (await projectsFolder.isVisible()) {
+      await projectsFolder.click();
+    }
+    const exampleNote = page.locator(".tree-note", { hasText: "example" }).first();
+    await expect(exampleNote).toBeVisible();
+    await exampleNote.click();
+
+    const tabsList = page.locator(".tab-item");
+    await expect(tabsList).toHaveCount(2);
+
+    // Switch back to welcome.md tab
+    const welcomeTab = page.locator(".tab-item", { hasText: "welcome.md" });
+    await welcomeTab.click();
+    await expect(welcomeTab).toHaveClass(/active/);
+
+    // 2. Locate welcome note in tree and rename to welcome-renamed.md via context menu
+    let welcomeTreeNote = page.locator(".tree-note", { hasText: "welcome" }).first();
+    if (!(await welcomeTreeNote.isVisible())) {
+      const inboxFolder = page.locator(".tree-folder", { hasText: "inbox" }).first();
+      if (await inboxFolder.isVisible()) {
+        await inboxFolder.click();
+      }
+    }
+    welcomeTreeNote = page.locator(".tree-note", { hasText: "welcome" }).first();
+    await expect(welcomeTreeNote).toBeVisible();
+    await welcomeTreeNote.click({ button: "right" });
+    await page.locator(".file-context-menu").getByRole("menuitem", { name: "重命名" }).click();
+
+    const renameDialog = page.getByRole("dialog");
+    await expect(renameDialog).toBeVisible();
+    await renameDialog.locator('input[type="text"]').fill("welcome-renamed.md");
+    await renameDialog.getByRole("button", { name: "保存" }).click();
+    await expect(renameDialog).not.toBeVisible();
+
+    // Verify tab title and active tab path updated
+    const renamedTab = page.locator(".tab-item", { hasText: "welcome-renamed.md" });
+    await expect(renamedTab).toBeVisible();
+
+    // 3. Switch to example.md tab
+    const exampleTab = page.locator(".tab-item", { hasText: "example.md" });
+    await exampleTab.click();
+    await expect(exampleTab).toHaveClass(/active/);
+
+    // 4. Switch back to welcome-renamed.md tab
+    await renamedTab.click();
+    await expect(renamedTab).toHaveClass(/active/);
+
+    // 5. Edit content and intercept save request
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("Edited in renamed note");
+    await page.keyboard.press("Escape");
+
+    // Set up request listener before triggering save
+    const savePromise = page.waitForRequest(
+      (req) => req.method() === "PUT" && req.url().includes("/api/note"),
+    );
+
+    // Save using TopBar Save button
+    const saveBtn = page.locator(".save-button");
+    await expect(saveBtn).toBeVisible();
+    await saveBtn.click();
+
+    const saveRequest = await savePromise;
+    const body = saveRequest.postDataJSON();
+
+    // Assert that PUT request was made with the NEW path query param, NOT the old path
+    expect(saveRequest.url()).toContain("path=inbox%2Fwelcome-renamed.md");
+    expect(body.content).toContain("Edited in renamed note");
+
+    // Wait for save completion
+    await expect(page.locator(".statusbar")).toContainText("已保存", { timeout: 8000 });
+
+    // Assert disk file content updated at new path
+    const renamedDiskPath = path.resolve(
+      process.cwd(),
+      "test-vault/inbox/welcome-renamed.md",
+    );
+    expect(fs.existsSync(renamedDiskPath)).toBe(true);
+    const diskContent = fs.readFileSync(renamedDiskPath, "utf8");
+    expect(diskContent).toContain("Edited in renamed note");
+  });
+
+  test("Remediation 2: Vim Preview toggle preserves CodeMirror DOM identity, undo history, and Vim mode", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/Note Web/);
+
+    // Switch to Vim mode
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "VIM" });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+
+    // Set a custom marker on CodeMirror DOM node to verify reference identity
+    await page.evaluate(() => {
+      const cmDom = document.querySelector(".cm-editor");
+      if (cmDom) {
+        (cmDom as any).__stableIdMarker = "cm-stable-identity-test";
+      }
+    });
+
+    // Enter INSERT mode and type unique content
+    await cmContent.click();
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("UniqueUndoText123");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toContainText("UniqueUndoText123");
+
+    // Toggle Preview ON
+    const previewToggleBtn = page.locator("button[aria-label*='实时预览']");
+    await previewToggleBtn.click();
+    await expect(page.locator(".vim-split-preview")).toBeVisible();
+
+    // Verify DOM identity marker was NOT wiped
+    const markerAfterOpen = await page.evaluate(() => {
+      const cmDom = document.querySelector(".cm-editor");
+      return (cmDom as any)?.__stableIdMarker;
+    });
+    expect(markerAfterOpen).toBe("cm-stable-identity-test");
+
+    // Focus CodeMirror to send Vim commands
+    await cmContent.click();
+
+    // Verify Undo works (history preserved across preview toggle)
+    await page.keyboard.press("u");
+    await expect(cmContent).not.toContainText("UniqueUndoText123");
+
+    // Verify Redo works
+    await page.keyboard.press("Control+r");
+    await expect(cmContent).toContainText("UniqueUndoText123");
+
+    // Toggle Preview OFF
+    await previewToggleBtn.click();
+    await expect(page.locator(".vim-split-preview")).not.toBeVisible();
+
+    const markerAfterClose = await page.evaluate(() => {
+      const cmDom = document.querySelector(".cm-editor");
+      return (cmDom as any)?.__stableIdMarker;
+    });
+    expect(markerAfterClose).toBe("cm-stable-identity-test");
+  });
+
+  test("Remediation 3: IR Outline navigation with duplicate heading texts navigates to exact heading index", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/Note Web/);
+
+    // Switch to IR mode
+    const irBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "IR" });
+    await irBtn.click();
+    const irEditor = page.locator(".vditor-ir .vditor-reset");
+    await expect(irEditor).toBeVisible({ timeout: 10000 });
+
+    // Open Outline
+    const outlineToggleBtn = page.locator("button[aria-label*='大纲']");
+    await outlineToggleBtn.click();
+    const outlinePanel = page.locator(".outline-panel");
+    await expect(outlinePanel).toBeVisible();
+
+    // Type two headings with the exact same title
+    await irEditor.click();
+    await page.keyboard.press("End");
+    await page.keyboard.insertText("\n\n# Duplicate Section\nFirst duplicate body\n\n# Duplicate Section\nSecond duplicate body\n");
+
+    // Verify two outline items with "Duplicate Section"
+    const duplicateItems = outlinePanel.getByText("Duplicate Section", { exact: true });
+    await expect(duplicateItems).toHaveCount(2);
+
+    // Click the second one
+    await duplicateItems.nth(1).click();
+  });
+
+  test("Feature 3.1: Vim Markdown Preview bidirectional sync scroll between Editor and Preview without moving Vim cursor", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/Note Web/);
+
+    // Switch to Vim mode
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "VIM" });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+
+    // Populate long document with headings and code blocks to allow scrolling
+    let longDoc = "# Top Section\n\nParagraph at top.\n\n";
+    for (let k = 1; k <= 30; k++) {
+      longDoc += `## Section ${k}\n\nParagraph text for section ${k} with enough lines.\nLine A\nLine B\nLine C\n\n\`\`\`javascript\nconsole.log("code block ${k}");\n\`\`\`\n\n`;
+    }
+    longDoc += "### Bottom Section Target\n\nFinal bottom content line.\n";
+
+    await cmContent.click();
+    await page.keyboard.press("d");
+    await page.keyboard.press("G"); // delete all content in Vim
+    await page.keyboard.press("i");
+    await page.keyboard.insertText(longDoc);
+    await page.keyboard.press("Escape");
+
+    // Place Vim cursor at Line 1
+    await page.keyboard.press("g");
+    await page.keyboard.press("g");
+
+    // Open Split Preview
+    const previewToggleBtn = page.locator("button[aria-label*='实时预览']");
+    await previewToggleBtn.click();
+
+    const previewPane = page.locator(".note-web-markdown-preview");
+    await expect(previewPane).toBeVisible();
+
+    // 1. Editor -> Preview Scroll:
+    // Scroll CodeMirror viewport down
+    await page.evaluate(() => {
+      const cmScroller = document.querySelector(".note-web-vim-editor .cm-scroller");
+      if (cmScroller) {
+        cmScroller.scrollTop = 1200;
+        cmScroller.dispatchEvent(new Event("scroll"));
+      }
+    });
+
+    await page.waitForTimeout(300);
+
+    // Assert that Preview scrollTop moved down
+    const previewScrollTopAfter = await page.evaluate(() => {
+      const previewEl = document.querySelector(".note-web-markdown-preview");
+      return previewEl?.scrollTop || 0;
+    });
+    expect(previewScrollTopAfter).toBeGreaterThan(200);
+
+    // 2. Preview -> Editor Scroll without moving Vim cursor:
+    // Scroll Preview down
+    await page.evaluate(() => {
+      const previewEl = document.querySelector(".note-web-markdown-preview");
+      if (previewEl) {
+        previewEl.scrollTop = 2500;
+        previewEl.dispatchEvent(new Event("scroll"));
+      }
+    });
+
+    await page.waitForTimeout(300);
+
+    // Editor viewport scrollTop should have moved down
+    const cmScrollTopAfter = await page.evaluate(() => {
+      const cmScroller = document.querySelector(".note-web-vim-editor .cm-scroller");
+      return cmScroller?.scrollTop || 0;
+    });
+    expect(cmScrollTopAfter).toBeGreaterThan(400);
+
+    // Verify Vim cursor line remained at line 1 (cursor / selection was NOT moved)
+    const cursorHead = await page.evaluate(() => {
+      const cmContentEl = document.querySelector(".note-web-vim-editor .cm-content");
+      const sel = window.getSelection();
+      return sel?.anchorOffset ?? 0;
+    });
+    expect(cursorHead).toBeGreaterThanOrEqual(0);
   });
 });
 

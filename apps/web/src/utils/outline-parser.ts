@@ -3,6 +3,7 @@ export interface HeadingItem {
   level: number;
   text: string;
   line: number;
+  index: number;
 }
 
 /**
@@ -14,19 +15,38 @@ export function parseHeadings(content: string): HeadingItem[] {
 
   const lines = content.split(/\r?\n/);
   const headings: HeadingItem[] = [];
-  let inCodeBlock = false;
+  let fenceChar: string | null = null;
+  let fenceLength = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const trimmed = line.trimStart();
 
-    // Check for code fences (``` or ~~~)
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
+    // Check for code fences (``` or ~~~) with CommonMark rules
+    const fenceMatch = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (fenceMatch) {
+      const matchFence = fenceMatch[1];
+      const matchChar = matchFence[0];
+      const matchLength = matchFence.length;
+      const rest = fenceMatch[2].trim();
+
+      if (fenceChar === null) {
+        // Opening fence
+        fenceChar = matchChar;
+        fenceLength = matchLength;
+        continue;
+      } else if (
+        matchChar === fenceChar &&
+        matchLength >= fenceLength &&
+        (matchChar === "~" || !rest.includes("`"))
+      ) {
+        // Closing fence must match opening fence char and length >= opening length
+        fenceChar = null;
+        fenceLength = 0;
+        continue;
+      }
     }
 
-    if (inCodeBlock) {
+    if (fenceChar !== null) {
       continue;
     }
 
@@ -42,6 +62,7 @@ export function parseHeadings(content: string): HeadingItem[] {
           level,
           text,
           line: i + 1,
+          index: headings.length,
         });
       }
     }

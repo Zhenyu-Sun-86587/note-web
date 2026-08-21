@@ -718,12 +718,21 @@ export default function App() {
       setTabs((prev) =>
         prev.map((t) =>
           t.path === renameTarget.path
-            ? { ...t, path: newPath, title: getBasename(newPath) }
+            ? {
+                ...t,
+                path: newPath,
+                title: getBasename(newPath),
+                doc: {
+                  ...t.doc,
+                  path: newPath,
+                  title: getBasename(newPath),
+                },
+              }
             : t,
         ),
       );
       if (currentOpenNote?.path === renameTarget.path) {
-        setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
+        setOpenNote((prev) => (prev ? { ...prev, path: newPath, title: getBasename(newPath) } : null));
       }
     } else {
       const affectsOpenNote =
@@ -741,12 +750,30 @@ export default function App() {
       setTabs((prev) =>
         prev.map((t) => {
           if (t.path === renameTarget.path) {
-            return { ...t, path: newPath, title: getBasename(newPath) };
+            return {
+              ...t,
+              path: newPath,
+              title: getBasename(newPath),
+              doc: {
+                ...t.doc,
+                path: newPath,
+                title: getBasename(newPath),
+              },
+            };
           }
           if (t.path.startsWith(`${renameTarget.path}/`)) {
             const suffix = t.path.slice(renameTarget.path.length);
             const remapPath = `${newPath}${suffix}`;
-            return { ...t, path: remapPath, title: getBasename(remapPath) };
+            return {
+              ...t,
+              path: remapPath,
+              title: getBasename(remapPath),
+              doc: {
+                ...t.doc,
+                path: remapPath,
+                title: getBasename(remapPath),
+              },
+            };
           }
           return t;
         }),
@@ -759,8 +786,9 @@ export default function App() {
           currentOpenNote.path.startsWith(`${renameTarget.path}/`))
       ) {
         const suffix = currentOpenNote.path.slice(renameTarget.path.length);
+        const remapPath = `${newPath}${suffix}`;
         setOpenNote((prev) =>
-          prev ? { ...prev, path: `${newPath}${suffix}` } : null,
+          prev ? { ...prev, path: remapPath, title: getBasename(remapPath) } : null,
         );
       }
       // Remap expandedFolders
@@ -795,12 +823,21 @@ export default function App() {
     setTabs((prev) =>
       prev.map((t) =>
         t.path === moveTarget
-          ? { ...t, path: newPath, title: getBasename(newPath) }
+          ? {
+              ...t,
+              path: newPath,
+              title: getBasename(newPath),
+              doc: {
+                ...t.doc,
+                path: newPath,
+                title: getBasename(newPath),
+              },
+            }
           : t,
       ),
     );
     if (openNote?.path === moveTarget) {
-      setOpenNote((prev) => (prev ? { ...prev, path: newPath } : null));
+      setOpenNote((prev) => (prev ? { ...prev, path: newPath, title: getBasename(newPath) } : null));
     }
     await loadTree();
     setMoveOpen(false);

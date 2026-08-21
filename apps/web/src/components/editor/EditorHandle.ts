@@ -5,5 +5,7 @@ export interface EditorHandle {
   focus: () => void;
   scrollToHeading?: (heading: HeadingItem) => void;
   scrollToLine?: (line: number) => void;
+  scrollViewportToLine?: (line: number) => void;
+  getVisibleTopLine?: () => number;
   getCursorLine?: () => number;
 }

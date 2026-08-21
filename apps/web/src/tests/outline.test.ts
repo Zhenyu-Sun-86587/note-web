@@ -20,36 +20,42 @@ describe("Outline / Heading Parser", () => {
       level: 1,
       text: "Heading 1",
       line: 1,
+      index: 0,
     });
     expect(headings[1]).toEqual({
       id: "heading-3-2",
       level: 2,
       text: "Heading 2",
       line: 3,
+      index: 1,
     });
     expect(headings[2]).toEqual({
       id: "heading-4-3",
       level: 3,
       text: "Heading 3",
       line: 4,
+      index: 2,
     });
     expect(headings[3]).toEqual({
       id: "heading-5-4",
       level: 4,
       text: "Heading 4",
       line: 5,
+      index: 3,
     });
     expect(headings[4]).toEqual({
       id: "heading-6-5",
       level: 5,
       text: "Heading 5",
       line: 6,
+      index: 4,
     });
     expect(headings[5]).toEqual({
       id: "heading-7-6",
       level: 6,
       text: "Heading 6",
       line: 7,
+      index: 5,
     });
   });
 
@@ -67,8 +73,10 @@ describe("Outline / Heading Parser", () => {
     expect(headings).toHaveLength(2);
     expect(headings[0].text).toBe("Real Heading 1");
     expect(headings[0].line).toBe(1);
+    expect(headings[0].index).toBe(0);
     expect(headings[1].text).toBe("Real Heading 2");
     expect(headings[1].line).toBe(6);
+    expect(headings[1].index).toBe(1);
   });
 
   it("ignores headings inside tilde fenced code blocks", () => {
@@ -85,6 +93,27 @@ describe("Outline / Heading Parser", () => {
     expect(headings[0].text).toBe("Top Title");
     expect(headings[1].text).toBe("Sub Title");
     expect(headings[1].line).toBe(5);
+  });
+
+  it("requires closing fence to use the same character and matching length", () => {
+    const md = [
+      "# Heading A",
+      "````markdown",
+      "# Inside 4-backtick block",
+      "```", // 3 backticks cannot close 4 backticks
+      "## Still inside",
+      "~~~", // tildes cannot close backticks
+      "### Still inside",
+      "````", // closes 4-backtick block
+      "# Heading B",
+    ].join("\n");
+
+    const headings = parseHeadings(md);
+    expect(headings).toHaveLength(2);
+    expect(headings[0].text).toBe("Heading A");
+    expect(headings[0].line).toBe(1);
+    expect(headings[1].text).toBe("Heading B");
+    expect(headings[1].line).toBe(9);
   });
 
   it("handles trailing hashes and whitespace in headings", () => {
