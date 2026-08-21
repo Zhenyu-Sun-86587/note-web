@@ -1,4 +1,5 @@
 import {
+  useState,
   useEffect,
   useRef,
   useImperativeHandle,
@@ -53,9 +54,12 @@ import {
   updateProxyPosition,
   isVimDialogActive,
   isNonPrintableOrControlKey,
-  isAsciiPrintable,
   forwardKeyToVim,
 } from "../../utils/vim-ime";
+import {
+  vimCompanion,
+  type VimNativeInputState,
+} from "../../utils/vim-companion";
 import "../../styles/vim-editor.css";
 
 export interface VimMarkdownEditorProps {
@@ -88,6 +92,7 @@ function ensureExCommands() {
   });
 
   Vim.defineEx("ir", "", () => {
+    vimCompanion.restoreTextInput();
     activeVimInstance?.switchToIR?.();
   });
 
@@ -176,11 +181,24 @@ export const VimMarkdownEditor = forwardRef<
     const vimEditableCompartment = useRef(new Compartment()).current;
     const proxyRef = useRef<HTMLTextAreaElement>(null);
 
+    const [companionState, setCompanionState] = useState<VimNativeInputState>(
+      vimCompanion.getInputState(),
+    );
+
+    useEffect(() => {
+      return vimCompanion.subscribe(() => {
+        setCompanionState(vimCompanion.getInputState());
+      });
+    }, []);
+
     // Keep active instance callbacks up to date
     useEffect(() => {
       activeVimInstance = {
         save: () => onSaveRef.current?.(),
-        switchToIR: () => onSwitchToIRRef.current?.(),
+        switchToIR: () => {
+          vimCompanion.restoreTextInput();
+          onSwitchToIRRef.current?.();
+        },
         toggleZen: () => onToggleZenRef.current?.(),
       };
     });
@@ -272,6 +290,10 @@ export const VimMarkdownEditor = forwardRef<
           const docString = update.state.doc.toString();
           lastEmittedValueRef.current = docString;
           onChangeRef.current(docString);
+        }
+        const currentCm = getCM(update.view);
+        if (isVimDialogActive(currentCm, update.view)) {
+          vimCompanion.restoreTextInput();
         }
       });
 
@@ -438,6 +460,12 @@ export const VimMarkdownEditor = forwardRef<
           return;
         }
         const isInsertOrReplace = e.mode === "insert" || e.mode === "replace";
+        if (isInsertOrReplace) {
+          vimCompanion.restoreTextInput();
+        } else {
+          vimCompanion.switchToCommandInput();
+        }
+
         queueMicrotask(() => {
           if (!viewRef.current) return;
           view.dispatch({
@@ -459,6 +487,12 @@ export const VimMarkdownEditor = forwardRef<
       };
       (cm as any)?.on?.("vim-mode-change", handleModeChange);
 
+      // On initial mount, switch to ASCII if in normal mode
+      const initialIsInsert = Boolean(cm?.state?.vim?.insertMode);
+      if (!initialIsInsert) {
+        vimCompanion.switchToCommandInput();
+      }
+
       let proxyCleanup: (() => void) | undefined;
       if (proxyRef.current && containerRef.current) {
         const attached = attachVimImeProxy(
@@ -475,7 +509,11 @@ export const VimMarkdownEditor = forwardRef<
       const handleFocusIn = (e: FocusEvent) => {
         const currentCm = getCM(view);
         const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
-        if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
+        if (isVimDialogActive(currentCm, view)) {
+          vimCompanion.restoreTextInput();
+          return;
+        }
+        if (!isInsertOrReplace) {
           if (
             e.target === document.body ||
             e.target === view.dom ||
@@ -506,13 +544,7 @@ export const VimMarkdownEditor = forwardRef<
         if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
           proxyRef.current?.focus();
           updateProxyPosition(view, proxyRef.current, containerRef.current);
-          if (
-            isNonPrintableOrControlKey(e) ||
-            (e.key.length === 1 &&
-              !e.ctrlKey &&
-              !e.metaKey &&
-              isAsciiPrintable(e.key))
-          ) {
+          if (isNonPrintableOrControlKey(e)) {
             e.preventDefault();
             e.stopPropagation();
             forwardKeyToVim(view, e);
@@ -527,6 +559,7 @@ export const VimMarkdownEditor = forwardRef<
       });
 
       return () => {
+        vimCompanion.restoreTextInput();
         window.removeEventListener("keydown", handleWindowKeyDown, true);
         document.removeEventListener("focusin", handleFocusIn);
         proxyCleanup?.();
@@ -574,6 +607,21 @@ export const VimMarkdownEditor = forwardRef<
       }
     };
 
+    const getCompanionStatusText = (state: VimNativeInputState) => {
+      switch (state) {
+        case "normal-ready":
+          return "VIM · IME Auto";
+        case "normal-pending":
+          return "VIM · IME…";
+        case "unavailable":
+          return "VIM · IME Fallback";
+        case "error":
+          return "VIM · IME Error";
+        default:
+          return "VIM · IME Auto";
+      }
+    };
+
     return (
       <div
         ref={containerRef}
@@ -592,9 +640,13 @@ export const VimMarkdownEditor = forwardRef<
           tabIndex={-1}
           aria-hidden="true"
         />
+        <div className="note-web-vim-ime-status" aria-live="polite">
+          {getCompanionStatusText(companionState)}
+        </div>
       </div>
     );
   },
 );
 
 VimMarkdownEditor.displayName = "VimMarkdownEditor";
+

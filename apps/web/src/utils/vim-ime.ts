@@ -1,6 +1,7 @@
 import { EditorView } from "@codemirror/view";
 import { getCM, Vim } from "@replit/codemirror-vim";
 import { persistVimSession } from "./vim-session";
+import { vimCompanion } from "./vim-companion";
 
 export interface PendingKey {
   key: string;
@@ -222,8 +223,40 @@ export function attachVimImeProxy(
       return;
     }
 
-    // Printable ASCII keys: DO NOT execute immediately in keydown!
-    // Store in pendingPrintableKey, wait for beforeinput to confirm it's plain text (not IME).
+    const companionState = vimCompanion.getInputState();
+
+    // 1. In normal-pending: ALL printable keys are blocked completely to prevent race conditions
+    if (companionState === "normal-pending") {
+      if (
+        e.key.length === 1 &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        isAsciiPrintable(e.key)
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      imeState.pendingPrintableKey = null;
+      return;
+    }
+
+    // 2. In normal-ready: Native companion has verified target window is ASCII, forward directly
+    if (companionState === "normal-ready") {
+      if (
+        e.key.length === 1 &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        isAsciiPrintable(e.key)
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        forwardKeyToVim(view, e);
+      }
+      imeState.pendingPrintableKey = null;
+      return;
+    }
+
+    // 3. Fallback (unavailable / error): Safe web proxy verification via beforeinput
     if (
       e.key.length === 1 &&
       !e.ctrlKey &&
@@ -238,7 +271,6 @@ export function attachVimImeProxy(
         altKey: e.altKey,
         metaKey: e.metaKey,
       };
-      // Allow browser beforeinput/compositionstart to follow
       return;
     }
 

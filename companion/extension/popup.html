@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Note Web Vim Companion</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      width: 280px;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      font-size: 13px;
+    }
+    h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #61afef;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #333;
+    }
+    .label {
+      color: #888;
+    }
+    .value {
+      font-weight: 500;
+      color: #98c379;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .status-ok {
+      background: rgba(152, 195, 121, 0.2);
+      color: #98c379;
+    }
+    .status-err {
+      background: rgba(224, 108, 117, 0.2);
+      color: #e06c75;
+    }
+    button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 8px;
+      background: #3e4451;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover {
+      background: #4b5263;
+    }
+  </style>
+</head>
+<body>
+  <h3>Note Web Vim Companion</h3>
+  <div class="row">
+    <span class="label">Native Host:</span>
+    <span id="host-status" class="value status-badge status-ok">Connected</span>
+  </div>
+  <div class="row">
+    <span class="label">Strategy:</span>
+    <span id="strategy-status" class="value">Keyboard Layout</span>
+  </div>
+  <div class="row">
+    <span class="label">Target Window:</span>
+    <span id="target-status" class="value">msedge.exe</span>
+  </div>
+  <div class="row">
+    <span class="label">State:</span>
+    <span id="mode-status" class="value">Ready</span>
+  </div>
+  <button id="test-btn">测试连接 (Test Connection)</button>
+  <script src="dist/popup.js"></script>
+</body>
+</html>

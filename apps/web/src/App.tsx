@@ -380,7 +380,10 @@ export default function App() {
     try {
       const latest = await fetchNote(current.path);
       if (latest.revision !== current.revision) {
-        if (draftContentRef.current === current.content) {
+        const isClean =
+          draftContentRef.current.replace(/\r\n/g, "\n") ===
+          current.content.replace(/\r\n/g, "\n");
+        if (isClean) {
           // Not dirty, safe to reload disk changes automatically
           setOpenNote(latest);
           setDraftContent(latest.content);

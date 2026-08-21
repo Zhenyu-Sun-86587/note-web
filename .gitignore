@@ -7,3 +7,5 @@ dist
 test-results
 playwright-report
 /srv
+target
+companion/extension/dist

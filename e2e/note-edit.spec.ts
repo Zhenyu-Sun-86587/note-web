@@ -1307,12 +1307,23 @@ test.describe("Note Web E2E Suite", () => {
       "inbox/welcome.md",
       { timeout: 10000 },
     );
+
+    // Clean up settings
+    await page.evaluate(() => {
+      localStorage.removeItem("note-web-settings-v1");
+      localStorage.removeItem("note-web-last-open-note-v1");
+    });
   });
 
   test("Vim external sync does not pollute undo history and 'u' does not restore old content", async ({
     page,
   }) => {
     await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.removeItem("note-web-settings-v1");
+      localStorage.removeItem("note-web-last-open-note-v1");
+    });
+    await page.reload();
     const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
       hasText: "VIM",
     });
@@ -1328,10 +1339,14 @@ test.describe("Note Web E2E Suite", () => {
 
     // 2. Direct external edit on the same note file on disk
     const externalContent = "# External Note Title\n\nExternal sync body content.";
+    await new Promise((r) => setTimeout(r, 250));
     fs.writeFileSync(welcomeFixturePath, externalContent, "utf8");
 
     // 3. Trigger window focus event to sync external changes
-    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect.poll(async () => {
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      return await cmContent.textContent();
+    }, { timeout: 8000, intervals: [300, 500] }).toContain("External Note Title");
 
     // 4. Wait for Vim editor to display the external content
     await expect(cmContent).toContainText("External Note Title");
@@ -1741,4 +1756,270 @@ test.describe("Note Web E2E Suite", () => {
       sessionStorage.removeItem("note-web-vim-session-v1"),
     );
   });
+
+  test("Vim IME Companion E2E: normal-pending blocks printable command 'i' until verified ACK enables normal-ready and INSERT", async ({
+    page,
+  }) => {
+    // 1. Setup Mock Companion Extension with a controlled switch delay
+    await page.addInitScript(() => {
+      (window as any).__mockCalls = [];
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data && data.source === "note-web" && data.channel === "vim-ime") {
+          (window as any).__mockCalls.push(data);
+          if (data.action === "ping") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "ping",
+              },
+              "*",
+            );
+          } else if (data.action === "switch_ascii") {
+            const delay = (window as any).__mockSwitchDelay || 250;
+            setTimeout(() => {
+              window.postMessage(
+                {
+                  source: "note-web-companion",
+                  channel: "vim-ime",
+                  id: data.id,
+                  ok: true,
+                  action: "switch_ascii",
+                  strategy: "keyboard_layout",
+                  verified: true,
+                  targetPid: 9999,
+                },
+                "*",
+              );
+            }, delay);
+          } else if (data.action === "restore") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "restore",
+                restored: true,
+              },
+              "*",
+            );
+          }
+        }
+      });
+    });
+
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    const imeStatus = page.locator(".note-web-vim-ime-status");
+    await expect(cmContent).toBeVisible();
+    await expect(imeStatus).toBeVisible();
+
+    // Verify IME status indicator renders Auto
+    await expect(imeStatus).toContainText("IME Auto");
+
+    // Enter INSERT mode
+    await cmContent.click();
+    await page.keyboard.press("i");
+    await expect(vimPanel).toContainText("INSERT");
+
+    // Set delay for next switch to simulate in-flight native switch
+    await page.evaluate(() => {
+      (window as any).__mockSwitchDelay = 350;
+    });
+
+    // Press Escape -> triggers switch_ascii, enters normal-pending
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // Immediately dispatch 'i' during normal-pending
+    await page.evaluate(() => {
+      const proxyEl = document.querySelector(
+        ".note-web-vim-ime-proxy",
+      ) as HTMLTextAreaElement;
+      proxyEl?.focus();
+      const event = new KeyboardEvent("keydown", {
+        key: "i",
+        code: "KeyI",
+        bubbles: true,
+        cancelable: true,
+      });
+      proxyEl?.dispatchEvent(event);
+    });
+
+    // Assert: during pending, 'i' was blocked, mode remains NORMAL
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toHaveAttribute("contenteditable", "false");
+
+    // Wait for native ACK to arrive (350ms delay + buffer)
+    await page.waitForTimeout(450);
+    await expect(imeStatus).toContainText("IME Auto");
+
+    // Now in normal-ready, pressing 'i' enters INSERT
+    await page.keyboard.press("i");
+    await expect(vimPanel).toContainText("INSERT");
+    await expect(cmContent).toHaveAttribute("contenteditable", "true");
+  });
+
+  test("Vim IME Companion E2E: Search / restores text input for Unicode queries, closing re-switches to ASCII", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (window as any).__mockCalls = [];
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data && data.source === "note-web" && data.channel === "vim-ime") {
+          (window as any).__mockCalls.push(data);
+          if (data.action === "ping") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "ping",
+              },
+              "*",
+            );
+          } else if (data.action === "switch_ascii") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "switch_ascii",
+                strategy: "keyboard_layout",
+                verified: true,
+              },
+              "*",
+            );
+          } else if (data.action === "restore") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "restore",
+                restored: true,
+              },
+              "*",
+            );
+          }
+        }
+      });
+    });
+
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+
+    // Press '/' to open Search dialog
+    await page.keyboard.press("/");
+
+    // Dialog input should be visible and active
+    const dialogInput = page.locator(".cm-vim-panel input, .cm-panel input");
+    await expect(dialogInput).toBeVisible({ timeout: 5000 });
+
+    // Type Unicode Chinese search term
+    await dialogInput.fill("欢迎使用");
+    await page.keyboard.press("Enter");
+
+    // After pressing Enter, dialog closes and editor returns to Normal
+    await expect(dialogInput).not.toBeVisible();
+
+    // Verify restore was requested when dialog opened
+    const calls = await page.evaluate(() => (window as any).__mockCalls || []);
+    const restoreCalls = calls.filter((c: any) => c.action === "restore");
+    expect(restoreCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  test("Vim IME Companion E2E: Switching from Vim to IR restores text input for rich text editing", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (window as any).__mockCalls = [];
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data && data.source === "note-web" && data.channel === "vim-ime") {
+          (window as any).__mockCalls.push(data);
+          if (data.action === "ping") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "ping",
+              },
+              "*",
+            );
+          } else if (data.action === "switch_ascii") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "switch_ascii",
+                strategy: "keyboard_layout",
+                verified: true,
+              },
+              "*",
+            );
+          } else if (data.action === "restore") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "restore",
+                restored: true,
+              },
+              "*",
+            );
+          }
+        }
+      });
+    });
+
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    const irBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "IR",
+    });
+
+    await vimBtn.click();
+    await expect(page.locator(".note-web-vim-editor")).toBeVisible();
+
+    // Switch to IR mode
+    await irBtn.click();
+    await expect(page.locator(".vditor-ir .vditor-reset")).toBeVisible();
+
+    // Verify restore was called when switching from Vim to IR
+    const calls = await page.evaluate(() => (window as any).__mockCalls || []);
+    const restoreCalls = calls.filter((c: any) => c.action === "restore");
+    expect(restoreCalls.length).toBeGreaterThanOrEqual(1);
+  });
 });
+

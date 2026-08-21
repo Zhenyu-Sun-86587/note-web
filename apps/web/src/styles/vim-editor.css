@@ -115,3 +115,18 @@
   outline: none;
   z-index: 0;
 }
+
+/* Vim Companion IME Status Indicator */
+.note-web-vim-ime-status {
+  position: absolute;
+  right: 16px;
+  bottom: 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 10;
+  user-select: none;
+  opacity: 0.85;
+}
+

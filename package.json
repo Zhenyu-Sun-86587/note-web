@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@types/chrome": "^0.2.6",
     "concurrently": "^8.2.2",
     "typescript": "^5.4.5"
   }
