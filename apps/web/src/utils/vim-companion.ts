@@ -190,6 +190,7 @@ export class VimCompanionService {
   public async switchToCommandInput(timeoutMs = 500): Promise<CompanionSwitchResult> {
     // Principle A: Intent Epoch is established immediately before any await
     const epoch = ++this.inputIntentEpoch;
+    const wasAlreadyAvailable = this.availability === "available";
 
     // 1. Initial checking await guard
     if (this.availability === "checking" && this.checkPromise) {
@@ -219,7 +220,15 @@ export class VimCompanionService {
       return this.staleSwitchResult();
     }
 
-    // Principle B: Actual Native switch begins only here once companion is available
+    // If Companion was not already confirmed available at the start of this call,
+    // this call only probes and updates availability. Keep current fallback state
+    // so in-flight multi-key Vim commands (dd, ciw, gg, "ayy) are never interrupted.
+    // Next explicit Normal acquisition will perform the actual Native switch.
+    if (!wasAlreadyAvailable) {
+      return { ok: false, fallback: true };
+    }
+
+    // Principle B: Actual Native switch begins only here once companion was confirmed available
     this.inputState = "normal-pending";
     this.notify();
 

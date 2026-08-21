@@ -2227,9 +2227,13 @@ test.describe("Note Web E2E Suite", () => {
       }
     });
 
-    // Enter insert mode then back to Normal mode to trigger reconnect probe
+    // 1. First Normal mode transition after reconnect triggers probe and updates availability to available
     const vimEditor = page.locator(".note-web-vim-editor .cm-content");
     await vimEditor.click();
+    await page.keyboard.type("i");
+    await page.keyboard.press("Escape");
+
+    // 2. Second Normal mode transition performs Native acquisition and establishes IME Auto
     await page.keyboard.type("i");
     await page.keyboard.press("Escape");
 

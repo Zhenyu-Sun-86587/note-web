@@ -34,31 +34,43 @@ describe("VimCompanionService and State Machine", () => {
     );
   });
 
-  it("P0-1: On-demand lightweight reconnect when previously unavailable", async () => {
+  it("P0-1: On-demand lightweight reconnect when previously unavailable probes only on first call, acquires on second call", async () => {
     const service = VimCompanionService.getInstance();
     service._mockSetAvailability("unavailable");
     service._mockSetInputState("unavailable");
 
-    // Call switchToCommandInput when unavailable -> triggers checkAvailability probe without normal-pending
-    const switchPromise = service.switchToCommandInput(500);
+    // 1. First call when unavailable -> triggers checkAvailability probe without normal-pending
+    const probePromise = service.switchToCommandInput(500);
     expect(service.getInputState()).toBe("unavailable");
 
     // Get the ping request id and reply success
     const pingIds = service._mockGetPendingRequestIds();
-    expect(pingIds.length).toBeGreaterThan(0);
+    expect(pingIds.length).toBe(1);
     service._mockDispatchResponse({
       id: pingIds[0],
       ok: true,
       action: "ping",
     });
 
-    // Advance microtasks for probe resolution -> now enters normal-pending and dispatches switch_ascii
+    // Advance microtasks for probe resolution
     await vi.advanceTimersByTimeAsync(10);
+
+    // Assert: First call resolves with fallback, availability is now available, state remains unavailable, NO switch_ascii dispatched
+    const probeResult = await probePromise;
+    expect(probeResult.ok).toBe(false);
+    expect(probeResult.fallback).toBe(true);
+    expect(service.getAvailability()).toBe("available");
+    expect(service.getInputState()).toBe("unavailable");
+
+    const pendingAfterProbe = service._mockGetPendingRequestIds();
+    expect(pendingAfterProbe.length).toBe(0);
+
+    // 2. Second call to switchToCommandInput() (when now available) -> begins Native acquisition
+    const switchPromise = service.switchToCommandInput(500);
     expect(service.getInputState()).toBe("normal-pending");
 
-    // Get the switch request id and reply verified success
     const switchIds = service._mockGetPendingRequestIds();
-    expect(switchIds.length).toBeGreaterThan(0);
+    expect(switchIds.length).toBe(1);
     service._mockDispatchResponse({
       id: switchIds[0],
       ok: true,
@@ -73,7 +85,6 @@ describe("VimCompanionService and State Machine", () => {
     const result = await switchPromise;
     expect(result.ok).toBe(true);
     expect(result.verified).toBe(true);
-    expect(service.getAvailability()).toBe("available");
     expect(service.getInputState()).toBe("normal-ready");
   });
 
