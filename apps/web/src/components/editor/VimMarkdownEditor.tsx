@@ -17,7 +17,7 @@ import {
   highlightSpecialChars,
   keymap,
 } from "@codemirror/view";
-import { EditorState, Transaction, Compartment, Prec } from "@codemirror/state";
+import { EditorState, Transaction, Compartment } from "@codemirror/state";
 import {
   defaultHighlightStyle,
   syntaxHighlighting,
@@ -48,6 +48,14 @@ import {
   restoreVimSessionOnce,
   persistVimSession,
 } from "../../utils/vim-session";
+import {
+  attachVimImeProxy,
+  updateProxyPosition,
+  isVimDialogActive,
+  isNonPrintableOrControlKey,
+  isAsciiPrintable,
+  forwardKeyToVim,
+} from "../../utils/vim-ime";
 import "../../styles/vim-editor.css";
 
 export interface VimMarkdownEditorProps {
@@ -165,6 +173,8 @@ export const VimMarkdownEditor = forwardRef<
 
     const lineNumberCompartment = useRef(new Compartment()).current;
     const lineWrappingCompartment = useRef(new Compartment()).current;
+    const vimEditableCompartment = useRef(new Compartment()).current;
+    const proxyRef = useRef<HTMLTextAreaElement>(null);
 
     // Keep active instance callbacks up to date
     useEffect(() => {
@@ -227,7 +237,16 @@ export const VimMarkdownEditor = forwardRef<
           return lastEmittedValueRef.current;
         },
         focus: () => {
-          viewRef.current?.focus();
+          const currentCm = viewRef.current ? getCM(viewRef.current) : null;
+          const isInsert = Boolean(currentCm?.state?.vim?.insertMode);
+          if (
+            isInsert ||
+            (viewRef.current && isVimDialogActive(currentCm, viewRef.current))
+          ) {
+            viewRef.current?.focus();
+          } else {
+            proxyRef.current?.focus();
+          }
         },
       }),
       [],
@@ -242,6 +261,13 @@ export const VimMarkdownEditor = forwardRef<
       lastEmittedValueRef.current = value;
 
       const updateListener = EditorView.updateListener.of((update) => {
+        if (update.selectionSet || update.viewportChanged) {
+          updateProxyPosition(
+            update.view,
+            proxyRef.current,
+            containerRef.current,
+          );
+        }
         if (update.docChanged) {
           const docString = update.state.doc.toString();
           lastEmittedValueRef.current = docString;
@@ -249,8 +275,26 @@ export const VimMarkdownEditor = forwardRef<
         }
       });
 
-      // 1. Intercept Ctrl shortcuts to prevent browser hijacking (e.g. Ctrl+R reload, Ctrl+P print, Ctrl+F find, etc.)
+      // 1. Intercept Ctrl shortcuts and maintain proxy focus in NORMAL/VISUAL mode
       const vimKeyInterceptor = EditorView.domEventHandlers({
+        focus: (_e, view) => {
+          const currentCm = getCM(view);
+          const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+          if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
+            proxyRef.current?.focus();
+            updateProxyPosition(view, proxyRef.current, containerRef.current);
+          }
+          return false;
+        },
+        click: (_e, view) => {
+          const currentCm = getCM(view);
+          const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+          if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
+            proxyRef.current?.focus();
+            updateProxyPosition(view, proxyRef.current, containerRef.current);
+          }
+          return false;
+        },
         keydown: (e, _view) => {
           // Narrow fallback persist if recording macro q or Escape
           if (e.key === "q" || e.key === "Escape") {
@@ -271,8 +315,6 @@ export const VimMarkdownEditor = forwardRef<
           }
 
           // Vim Control chords: ALWAYS e.ctrlKey (never metaKey / Mac Command)
-          // Prevent conflicting browser shortcuts from hijacking Vim control chords.
-          // Mac Command shortcuts (Cmd+R, Cmd+F, Cmd+W, Cmd+P, Cmd+Q) continue to be handled by the browser.
           if (e.ctrlKey && !e.metaKey && !e.altKey) {
             const key = e.key.toLowerCase();
             const vimHijackCtrlKeys = new Set([
@@ -360,40 +402,12 @@ export const VimMarkdownEditor = forwardRef<
         ]),
       ];
 
-      // Low-priority inputHandler fallback: prevents unconsumed IME composition text
-      // (such as multi-character Chinese text committed via IME) from directly modifying
-      // the document outside of Insert mode, while preserving Insert mode text input and
-      // literal character composition (e.g. f/r/t).
-      const normalModeTextInputGuard = Prec.low(
-        EditorView.inputHandler.of((view, _from, _to, _text) => {
-          const cm = getCM(view);
-          const vimState = cm?.state?.vim;
-
-          // No Vim state -> allow default
-          if (!vimState) return false;
-
-          // In Insert mode -> allow text input
-          if (vimState.insertMode) return false;
-
-          // Ongoing Vim operation -> allow
-          if (cm.curOp?.isVimOp) return false;
-
-          // Special case: codemirror-vim handles literal input (e.g. f/r/t) with IME composition
-          if (vimState.expectLiteralNext && view.composing) {
-            return false;
-          }
-
-          // Outside Insert mode, block all unconsumed text input from directly editing doc
-          return true;
-        }),
-      );
-
       const view = new EditorView({
         doc: value,
         extensions: [
+          vimEditableCompartment.of(EditorView.editable.of(false)),
           vimKeyInterceptor,
           vim({ status: true }),
-          normalModeTextInputGuard,
           lineNumberCompartment.of(
             createLineNumberGutter(Boolean(vimRelativeLineNumbers)),
           ),
@@ -417,7 +431,106 @@ export const VimMarkdownEditor = forwardRef<
       (cm as any)?.on?.("vim-command-done", persistAfterVimCommand);
       (cm as any)?.on?.("vim-keypress", persistAfterVimCommand);
 
+      const handleModeChange = (e: { mode: string; subMode?: string }) => {
+        const globalState = (Vim as any).getVimGlobalState_?.();
+        const isPlayingMacro = Boolean(globalState?.macroModeState?.isPlaying);
+        if (isPlayingMacro) {
+          return;
+        }
+        const isInsertOrReplace = e.mode === "insert" || e.mode === "replace";
+        queueMicrotask(() => {
+          if (!viewRef.current) return;
+          view.dispatch({
+            effects: vimEditableCompartment.reconfigure(
+              EditorView.editable.of(isInsertOrReplace),
+            ),
+          });
+          if (isInsertOrReplace) {
+            proxyRef.current?.blur();
+            view.focus();
+          } else {
+            const currentCm = getCM(view);
+            if (!isVimDialogActive(currentCm, view)) {
+              proxyRef.current?.focus();
+              updateProxyPosition(view, proxyRef.current, containerRef.current);
+            }
+          }
+        });
+      };
+      (cm as any)?.on?.("vim-mode-change", handleModeChange);
+
+      let proxyCleanup: (() => void) | undefined;
+      if (proxyRef.current && containerRef.current) {
+        const attached = attachVimImeProxy(
+          view,
+          proxyRef.current,
+          containerRef.current,
+          {
+            onSave: () => onSaveRef.current?.(),
+          },
+        );
+        proxyCleanup = attached.cleanup;
+      }
+
+      const handleFocusIn = (e: FocusEvent) => {
+        const currentCm = getCM(view);
+        const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+        if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
+          if (
+            e.target === document.body ||
+            e.target === view.dom ||
+            (e.target as HTMLElement)?.classList?.contains("cm-content") ||
+            (e.target as HTMLElement)?.classList?.contains("cm-editor") ||
+            (e.target as HTMLElement)?.classList?.contains("note-web-vim-editor")
+          ) {
+            proxyRef.current?.focus();
+            updateProxyPosition(view, proxyRef.current, containerRef.current);
+          }
+        }
+      };
+      document.addEventListener("focusin", handleFocusIn);
+
+      const handleWindowKeyDown = (e: KeyboardEvent) => {
+        if (e.target === proxyRef.current) return;
+        const target = e.target as HTMLElement;
+        if (
+          target &&
+          (target.tagName === "INPUT" ||
+            (target.tagName === "TEXTAREA" &&
+              !target.classList.contains("note-web-vim-ime-proxy")))
+        ) {
+          return;
+        }
+        const currentCm = getCM(view);
+        const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+        if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
+          proxyRef.current?.focus();
+          updateProxyPosition(view, proxyRef.current, containerRef.current);
+          if (
+            isNonPrintableOrControlKey(e) ||
+            (e.key.length === 1 &&
+              !e.ctrlKey &&
+              !e.metaKey &&
+              isAsciiPrintable(e.key))
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            forwardKeyToVim(view, e);
+          }
+        }
+      };
+      window.addEventListener("keydown", handleWindowKeyDown, true);
+
+      queueMicrotask(() => {
+        proxyRef.current?.focus();
+        updateProxyPosition(view, proxyRef.current, containerRef.current);
+      });
+
       return () => {
+        window.removeEventListener("keydown", handleWindowKeyDown, true);
+        document.removeEventListener("focusin", handleFocusIn);
+        proxyCleanup?.();
+        (cm as any)?.off?.("vim-mode-change", handleModeChange);
         (cm as any)?.off?.("vim-command-done", persistAfterVimCommand);
         (cm as any)?.off?.("vim-keypress", persistAfterVimCommand);
         persistVimSession();
@@ -444,7 +557,43 @@ export const VimMarkdownEditor = forwardRef<
       }
     }, [value]);
 
-    return <div ref={containerRef} className="note-web-vim-editor" />;
+    const refocusProxyIfNormal = () => {
+      const currentCm = viewRef.current ? getCM(viewRef.current) : null;
+      const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+      if (
+        !isInsertOrReplace &&
+        viewRef.current &&
+        !isVimDialogActive(currentCm, viewRef.current)
+      ) {
+        proxyRef.current?.focus();
+        updateProxyPosition(
+          viewRef.current,
+          proxyRef.current,
+          containerRef.current,
+        );
+      }
+    };
+
+    return (
+      <div
+        ref={containerRef}
+        className="note-web-vim-editor"
+        onPointerDown={refocusProxyIfNormal}
+        onPointerUp={refocusProxyIfNormal}
+        onClick={refocusProxyIfNormal}
+      >
+        <textarea
+          ref={proxyRef}
+          className="note-web-vim-ime-proxy"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+      </div>
+    );
   },
 );
 

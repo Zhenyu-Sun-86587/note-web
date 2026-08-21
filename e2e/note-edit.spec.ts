@@ -746,6 +746,265 @@ test.describe("Note Web E2E Suite", () => {
     await expect(vditorEditor).toContainText("secondword thirdword");
   });
 
+  test("Vim DOM invariant: contenteditable is false in NORMAL/VISUAL and true in INSERT/REPLACE", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible();
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // 1. NORMAL mode: contenteditable === "false"
+    await expect(cmContent).toHaveAttribute("contenteditable", "false");
+
+    // 2. VISUAL mode: contenteditable === "false"
+    await page.keyboard.press("v");
+    await expect(vimPanel).toContainText("VISUAL");
+    await expect(cmContent).toHaveAttribute("contenteditable", "false");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toHaveAttribute("contenteditable", "false");
+
+    // 3. INSERT mode: contenteditable === "true"
+    await page.keyboard.press("i");
+    await expect(vimPanel).toContainText("INSERT");
+    await expect(cmContent).toHaveAttribute("contenteditable", "true");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toHaveAttribute("contenteditable", "false");
+
+    // 4. REPLACE mode (Shift+R): contenteditable === "true"
+    await page.keyboard.press("R");
+    await expect(vimPanel).toContainText("REPLACE");
+    await expect(cmContent).toHaveAttribute("contenteditable", "true");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toHaveAttribute("contenteditable", "false");
+  });
+
+  test("P0 IME isolation: standalone keydown 'i' does not enter INSERT and composition lifecycle never emits Vim commands", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    const proxy = page.locator(".note-web-vim-editor .note-web-vim-ime-proxy");
+    await expect(cmContent).toBeVisible();
+    await expect(proxy).toBeAttached();
+
+    await cmContent.click();
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    const originalText = await cmContent.textContent();
+
+    // 1. Synthetic event-order test: dispatch standalone keydown 'i' without beforeinput
+    // Vim must NOT execute 'i' command or enter INSERT mode
+    await page.evaluate(() => {
+      const proxyEl = document.querySelector(
+        ".note-web-vim-ime-proxy",
+      ) as HTMLTextAreaElement;
+      proxyEl.focus();
+      const keyEvent = new KeyboardEvent("keydown", {
+        key: "i",
+        code: "KeyI",
+        bubbles: true,
+        cancelable: true,
+      });
+      proxyEl.dispatchEvent(keyEvent);
+    });
+
+    // Assert: still NORMAL, contenteditable is false
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toHaveAttribute("contenteditable", "false");
+
+    // 2. Dispatch compositionstart (simulating Chinese IME composition started)
+    await page.evaluate(() => {
+      const proxyEl = document.querySelector(
+        ".note-web-vim-ime-proxy",
+      ) as HTMLTextAreaElement;
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionstart", { bubbles: true }),
+      );
+    });
+
+    // Assert: still NORMAL
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // 3. Dispatch full Chinese composition sequence: "nihao" -> "你好"
+    await page.evaluate(() => {
+      const proxyEl = document.querySelector(
+        ".note-web-vim-ime-proxy",
+      ) as HTMLTextAreaElement;
+      // n
+      proxyEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "n",
+          code: "KeyN",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionupdate", {
+          data: "n",
+          bubbles: true,
+        }),
+      );
+      // i (must not trigger INSERT)
+      proxyEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "i",
+          code: "KeyI",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionupdate", {
+          data: "ni",
+          bubbles: true,
+        }),
+      );
+      // h (must not move cursor left)
+      proxyEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "h",
+          code: "KeyH",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionupdate", {
+          data: "nih",
+          bubbles: true,
+        }),
+      );
+      // a (must not append)
+      proxyEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "a",
+          code: "KeyA",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionupdate", {
+          data: "niha",
+          bubbles: true,
+        }),
+      );
+      // o (must not open line)
+      proxyEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "o",
+          code: "KeyO",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionupdate", {
+          data: "nihao",
+          bubbles: true,
+        }),
+      );
+
+      // commit "你好"
+      proxyEl.value = "你好";
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionend", {
+          data: "你好",
+          bubbles: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new InputEvent("beforeinput", {
+          inputType: "insertCompositionText",
+          data: "你好",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new InputEvent("input", {
+          inputType: "insertCompositionText",
+          data: "你好",
+          bubbles: true,
+        }),
+      );
+    });
+
+    // Assert: Document completely unchanged, mode is still NORMAL
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).not.toContainText("你好");
+    const afterCompText = await cmContent.textContent();
+    expect(afterCompText).toBe(originalText);
+
+    // 4. In VISUAL mode: Chinese composition also completely isolated
+    await page.keyboard.press("v");
+    await expect(vimPanel).toContainText("VISUAL");
+
+    await page.evaluate(() => {
+      const proxyEl = document.querySelector(
+        ".note-web-vim-ime-proxy",
+      ) as HTMLTextAreaElement;
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionstart", { bubbles: true }),
+      );
+      proxyEl.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "z",
+          code: "KeyZ",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionupdate", {
+          data: "zhong",
+          bubbles: true,
+        }),
+      );
+      proxyEl.value = "中文";
+      proxyEl.dispatchEvent(
+        new CompositionEvent("compositionend", {
+          data: "中文",
+          bubbles: true,
+        }),
+      );
+      proxyEl.dispatchEvent(
+        new InputEvent("beforeinput", {
+          inputType: "insertCompositionText",
+          data: "中文",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    // Assert: still VISUAL, document unchanged
+    await expect(vimPanel).toContainText("VISUAL");
+    await expect(cmContent).not.toContainText("中文");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+  });
+
   test("handles Chinese IME and blocks text input outside Insert mode", async ({
     page,
   }) => {
