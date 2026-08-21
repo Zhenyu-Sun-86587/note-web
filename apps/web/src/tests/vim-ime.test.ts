@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   isAsciiPrintable,
-  isVimCtrlChord,
   isNonPrintableOrControlKey,
   createVimImeState,
   attachVimImeProxy,
 } from "../utils/vim-ime";
+import { isVimOwnedCtrlChord, isAppOwnedShortcut } from "../utils/vim-keyboard";
 import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { vim } from "@replit/codemirror-vim";
@@ -32,32 +32,27 @@ describe("Vim IME Isolation Utilities", () => {
     });
   });
 
-  describe("isVimCtrlChord", () => {
+  describe("isVimCtrlChord / isVimOwnedCtrlChord", () => {
     it("recognizes all specified Vim Ctrl chords", () => {
       const vimChords = [
-        "r", "f", "b", "d", "u", "p", "n", "w", "a", "e", "y", "v",
+        "r", "f", "b", "d", "u", "w", "a", "e", "y", "v",
         "[", "]", "c", "h", "j", "k", "l", "g", "t", "i", "m", "q",
         "o", "x",
       ];
 
       for (const key of vimChords) {
-        expect(isVimCtrlChord({ key, ctrlKey: true })).toBe(true);
-        expect(isVimCtrlChord({ key: key.toUpperCase(), ctrlKey: true })).toBe(true);
+        expect(isVimOwnedCtrlChord({ key, ctrlKey: true })).toBe(true);
+        expect(isVimOwnedCtrlChord({ key: key.toUpperCase(), ctrlKey: true })).toBe(true);
       }
 
-      expect(isVimCtrlChord({ key: "[", code: "BracketLeft", ctrlKey: true })).toBe(true);
-      expect(isVimCtrlChord({ key: "]", code: "BracketRight", ctrlKey: true })).toBe(true);
+      expect(isVimOwnedCtrlChord({ key: "[", code: "BracketLeft", ctrlKey: true })).toBe(true);
+      expect(isVimOwnedCtrlChord({ key: "]", code: "BracketRight", ctrlKey: true })).toBe(true);
     });
 
-    it("does not treat Ctrl+S as a generic Vim Ctrl chord (reserved for App Save)", () => {
-      expect(isVimCtrlChord({ key: "s", ctrlKey: true })).toBe(false);
-      expect(isVimCtrlChord({ key: "S", ctrlKey: true })).toBe(false);
-    });
-
-    it("rejects non-Ctrl modifiers or plain keys", () => {
-      expect(isVimCtrlChord({ key: "r", ctrlKey: false })).toBe(false);
-      expect(isVimCtrlChord({ key: "r", ctrlKey: true, altKey: true })).toBe(false);
-      expect(isVimCtrlChord({ key: "r", ctrlKey: true, metaKey: true })).toBe(false);
+    it("does not treat App-owned shortcuts (Ctrl+S, Ctrl+P, Ctrl+N) as generic Vim Ctrl chords", () => {
+      expect(isAppOwnedShortcut({ key: "s", ctrlKey: true })).toBe("save");
+      expect(isAppOwnedShortcut({ key: "p", ctrlKey: true })).toBe("quick-open");
+      expect(isAppOwnedShortcut({ key: "n", ctrlKey: true })).toBe("new-note");
     });
   });
 
@@ -78,7 +73,7 @@ describe("Vim IME Isolation Utilities", () => {
       expect(isNonPrintableOrControlKey(makeEvent("ArrowDown"))).toBe(true);
       expect(isNonPrintableOrControlKey(makeEvent("r", true))).toBe(true); // Ctrl+R
       expect(isNonPrintableOrControlKey(makeEvent("f", true))).toBe(true); // Ctrl+F
-      expect(isNonPrintableOrControlKey(makeEvent("p", true))).toBe(true); // Ctrl+P
+      expect(isNonPrintableOrControlKey(makeEvent("b", true))).toBe(true); // Ctrl+B
       expect(isNonPrintableOrControlKey(makeEvent("d", true))).toBe(true); // Ctrl+D
       expect(isNonPrintableOrControlKey(makeEvent("u", true))).toBe(true); // Ctrl+U
     });
@@ -114,8 +109,8 @@ describe("Vim IME Isolation Utilities", () => {
     });
   });
 
-  describe("attachVimImeProxy keyboard interception", () => {
-    it("unconditionally prevents default and stops propagation for Ctrl chords (Ctrl+R, Ctrl+F, Ctrl+P)", () => {
+  describe("attachVimImeProxy fallback interception", () => {
+    it("prevents default and stops propagation for Vim-owned Ctrl chords in fallback mode", () => {
       const container = document.createElement("div");
       const textarea = document.createElement("textarea");
       container.appendChild(textarea);
@@ -132,8 +127,8 @@ describe("Vim IME Isolation Utilities", () => {
       const onSave = vi.fn();
       const proxy = attachVimImeProxy(view, textarea, container, { onSave });
 
-      const testKeys = ["r", "f", "p", "d", "u", "b", "w"];
-      for (const k of testKeys) {
+      const vimKeys = ["r", "f", "d", "u", "b", "w"];
+      for (const k of vimKeys) {
         let prevented = false;
         let stopped = false;
         const event = new KeyboardEvent("keydown", {

@@ -2241,9 +2241,53 @@ test.describe("Note Web E2E Suite", () => {
     await expect(imeStatus).toContainText("IME Auto");
   });
 
-  test("Vim keyboard ownership: NORMAL/VISUAL mode prevents browser default actions for Ctrl+R, Ctrl+F, Ctrl+P and executes Vim commands", async ({
+  test("Unified keyboard ownership: normal-ready focuses CodeMirror, Vim owns Ctrl+R/F, Note Web owns Ctrl+P/N/S", async ({
     page,
   }) => {
+    // 1. Mock Companion Extension to simulate normal-ready (IME Auto)
+    await page.addInitScript(() => {
+      (window as any).__mockCalls = [];
+      (window as any).__print_call_count = 0;
+      (window as any).__e2e_page_marker = "active_session_123";
+
+      window.print = () => {
+        (window as any).__print_call_count++;
+      };
+
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data && data.source === "note-web" && data.channel === "vim-ime") {
+          (window as any).__mockCalls.push(data);
+
+          if (data.action === "ping") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "ping",
+              },
+              "*",
+            );
+          } else if (data.action === "switch_ascii") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "switch_ascii",
+                strategy: "keyboard_layout",
+                verified: true,
+              },
+              "*",
+            );
+          }
+        }
+      });
+    });
+
     await page.goto("/");
     const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
       hasText: "VIM",
@@ -2252,65 +2296,69 @@ test.describe("Note Web E2E Suite", () => {
 
     const cmContent = page.locator(".note-web-vim-editor .cm-content");
     const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    const imeStatus = page.locator(".note-web-vim-ime-status");
     await expect(cmContent).toBeVisible({ timeout: 10000 });
     await expect(vimPanel).toContainText("NORMAL");
+    await expect(imeStatus).toContainText("IME Auto");
 
-    // 1. Focus editor in NORMAL mode
+    // 2. In normal-ready mode: activeElement is CodeMirror (.cm-content), NOT proxy!
     await cmContent.click();
-    await expect(vimPanel).toContainText("NORMAL");
-
-    // Set page session markers and spies
-    await page.evaluate(() => {
-      (window as any).__e2e_page_marker = "active_session_123";
-      (window as any).__print_call_count = 0;
-      window.print = () => {
-        (window as any).__print_call_count++;
-      };
+    const activeIsCodeMirror = await page.evaluate(() => {
+      const active = document.activeElement;
+      return (
+        active?.classList.contains("cm-content") ||
+        Boolean(active?.closest(".cm-editor"))
+      );
     });
+    expect(activeIsCodeMirror).toBe(true);
 
-    // 2. Insert test line
-    await page.keyboard.press("G");
-    await page.keyboard.press("o");
-    await page.keyboard.type("firstword secondword thirdword");
+    // 3. Test Vim editing and Ctrl+R (Vim-owned Redo):
+    await page.keyboard.press("c");
+    await page.keyboard.press("i");
+    await page.keyboard.press("w");
+    await page.keyboard.type("replacedtoken");
     await page.keyboard.press("Escape");
     await expect(vimPanel).toContainText("NORMAL");
-    await expect(cmContent).toContainText("firstword secondword thirdword");
-
-    // 3. Test Ctrl+R (Redo) without page reload:
-    // Delete firstword with dw
-    await page.keyboard.press("0");
-    await page.keyboard.press("d");
-    await page.keyboard.press("w");
-    await expect(cmContent).not.toContainText("firstword");
-    await expect(cmContent).toContainText("secondword thirdword");
+    await expect(cmContent).toContainText("replacedtoken");
 
     // Undo with u
     await page.keyboard.press("u");
-    await expect(cmContent).toContainText("firstword secondword thirdword");
+    await expect(cmContent).not.toContainText("replacedtoken");
 
-    // Press Control+r for Vim Redo
+    // Redo with Control+r (Vim-owned Redo)
     await page.keyboard.press("Control+r");
-    // Verify firstword was deleted again via Vim redo
-    await expect(cmContent).not.toContainText("firstword");
-    await expect(cmContent).toContainText("secondword thirdword");
+    await expect(cmContent).toContainText("replacedtoken");
 
     // Verify page did NOT reload (session marker intact)
     const marker = await page.evaluate(() => (window as any).__e2e_page_marker);
     expect(marker).toBe("active_session_123");
 
-    // 4. Test Ctrl+P (Previous Line / motion in Vim) without triggering browser print
+    // 5. Test Ctrl+F (Vim-owned Page Down):
+    await page.keyboard.press("Control+f");
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // 6. Test Ctrl+P (Note Web-owned Quick Open):
+    // Must open Quick Open modal and NOT trigger browser print (window.print)
     await page.keyboard.press("Control+p");
+    const quickOpenDialog = page.getByRole("dialog");
+    await expect(quickOpenDialog).toBeVisible();
     const printCalls = await page.evaluate(
       () => (window as any).__print_call_count,
     );
     expect(printCalls).toBe(0);
 
-    // 5. Test Ctrl+F (Page Down / scroll in Vim)
-    await page.keyboard.press("Control+f");
-    // Focus remains in proxy and NORMAL mode remains active
-    await expect(vimPanel).toContainText("NORMAL");
+    // Close dialog via Escape
+    await page.keyboard.press("Escape");
+    await expect(quickOpenDialog).not.toBeVisible();
 
-    // 6. Test Ctrl+S executes app save
+    // 7. Test Ctrl+N (Note Web-owned New Note):
+    await page.keyboard.press("Control+n");
+    const newNoteDialog = page.getByRole("dialog");
+    await expect(newNoteDialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(newNoteDialog).not.toBeVisible();
+
+    // 8. Test Ctrl+S (Note Web-owned Save):
     await page.keyboard.press("Control+s");
     const statusBar = page.locator(".statusbar");
     await expect(statusBar).toContainText("已保存", { timeout: 8000 });

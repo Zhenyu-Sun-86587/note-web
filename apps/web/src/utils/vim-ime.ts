@@ -2,6 +2,7 @@ import { EditorView } from "@codemirror/view";
 import { getCM, Vim } from "@replit/codemirror-vim";
 import { persistVimSession } from "./vim-session";
 import { vimCompanion } from "./vim-companion";
+import { isAppOwnedShortcut, isVimOwnedCtrlChord } from "./vim-keyboard";
 
 export interface PendingKey {
   key: string;
@@ -237,9 +238,6 @@ export function attachVimImeProxy(
   options: AttachProxyOptions = {},
 ) {
   const imeState = createVimImeState();
-  const isMac =
-    typeof navigator !== "undefined" &&
-    /Macintosh|Mac OS X/i.test(navigator.userAgent);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     // If currently composing in IME, ignore keydown in command layer
@@ -252,31 +250,25 @@ export function attachVimImeProxy(
       queueMicrotask(persistVimSession);
     }
 
-    // App Save: Cmd+S on Mac, Ctrl+S elsewhere
-    const isSave =
-      (isMac ? e.metaKey : e.ctrlKey) &&
-      !e.shiftKey &&
-      !e.altKey &&
-      e.key.toLowerCase() === "s";
-    if (isSave) {
-      e.preventDefault();
-      e.stopPropagation();
-      options.onSave?.();
+    // Check Note Web-owned Application Shortcuts
+    const appAction = isAppOwnedShortcut(e);
+    if (appAction) {
+      if (appAction === "save") {
+        e.preventDefault();
+        e.stopPropagation();
+        options.onSave?.();
+        imeState.pendingPrintableKey = null;
+        return;
+      }
+      // For other App-owned shortcuts (Quick Open, New Note, Settings, Search, Sidebar):
+      // Do not forward to Vim, let the event bubble up to window shortcut listener
       imeState.pendingPrintableKey = null;
       return;
     }
 
-    // Ctrl chords are handled at window capture level.
-    // If an event reaches here, prevent default & stop propagation so browser doesn't grab it, but do not forward twice.
-    if (isVimCtrlChord(e)) {
-      e.preventDefault();
-      e.stopPropagation();
-      imeState.pendingPrintableKey = null;
-      return;
-    }
-
-    // Non-printable navigation/editing keys (Escape, Enter, Backspace, Arrows, etc.): execute immediately
-    if (isNonPrintableOrControlKey(e)) {
+    // Vim-owned Ctrl chords and non-printable navigation/editing keys in fallback mode:
+    // Execute immediately via forwardKeyToVim
+    if (isVimOwnedCtrlChord(e) || isNonPrintableOrControlKey(e)) {
       e.preventDefault();
       e.stopPropagation();
       imeState.pendingPrintableKey = null;

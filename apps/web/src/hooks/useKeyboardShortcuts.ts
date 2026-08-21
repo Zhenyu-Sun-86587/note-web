@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { isAppOwnedShortcut } from "../utils/vim-keyboard";
 
 interface ShortcutsOptions {
   onSave?: () => void;
@@ -19,102 +20,45 @@ export function useKeyboardShortcuts(options: ShortcutsOptions) {
         target?.closest(".modal-backdrop, .modal-content, [role='dialog']"),
       );
 
-      const isMac =
-        typeof navigator !== "undefined" &&
-        navigator.platform.toUpperCase().includes("MAC");
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-
-      // Save: Ctrl/Cmd + S is always intercepted and handled
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        e.key.toLowerCase() === "s"
-      ) {
-        e.preventDefault();
-        options.onSave?.();
-        return;
-      }
-
-      // If focus is inside Vim editor (and not inside an open modal dialog),
-      // allow Vim to handle all other keys natively (Ctrl+P, Ctrl+N, Ctrl+B, Ctrl+F, Escape, etc.)
-      // and prevent browser shortcuts (e.g. Ctrl+R reload, Ctrl+P print) from taking over Vim chords.
-      if (isInsideVim && !isInsideModal) {
-        if (e.ctrlKey && !e.metaKey && !e.altKey) {
-          const key = e.key.toLowerCase();
-          const vimHijackCtrlKeys = new Set([
-            "r",
-            "p",
-            "f",
-            "b",
-            "d",
-            "u",
-            "o",
-            "n",
-            "w",
-            "a",
-            "e",
-            "y",
-            "v",
-            "[",
-            "]",
-            "c",
-            "h",
-            "j",
-            "k",
-            "l",
-            "g",
-            "t",
-            "i",
-            "m",
-            "q",
-          ]);
-          if (vimHijackCtrlKeys.has(key)) {
-            e.preventDefault();
-          }
+      // 1. Escape: inside modal dialogs OR when outside Vim editor (e.g. IR editor Zen mode exit)
+      if (e.key === "Escape") {
+        if (!isInsideVim || isInsideModal) {
+          options.onEscape?.();
         }
         return;
       }
 
-      if (e.key === "Escape") {
-        options.onEscape?.();
+      // 2. Note Web-owned Application Shortcuts
+      const appAction = isAppOwnedShortcut(e);
+      if (appAction) {
+        e.preventDefault();
+        e.stopPropagation();
+        switch (appAction) {
+          case "save":
+            options.onSave?.();
+            break;
+          case "quick-open":
+            options.onQuickOpen?.();
+            break;
+          case "new-note":
+            options.onNewNote?.();
+            break;
+          case "search":
+            options.onSearch?.();
+            break;
+          case "sidebar":
+            options.onToggleSidebar?.();
+            break;
+          case "settings":
+            options.onOpenSettings?.();
+            break;
+        }
         return;
       }
 
-      // Settings: Ctrl/Cmd + ,
-      if (mod && !e.shiftKey && !e.altKey && e.key === ",") {
-        e.preventDefault();
-        options.onOpenSettings?.();
-        return;
-      }
-
-      // Quick Open: Ctrl/Cmd + P
-      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        options.onQuickOpen?.();
-        return;
-      }
-
-      // Toggle Sidebar: Ctrl/Cmd + Shift + B
-      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        options.onToggleSidebar?.();
-        return;
-      }
-
-      // Global Search: Ctrl/Cmd + Shift + F
-      if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        options.onSearch?.();
-        return;
-      }
-
-      // New Note: Ctrl/Cmd + N
-      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        options.onNewNote?.();
-        return;
-      }
+      // 3. Vim-owned shortcuts and all other keyboard events:
+      // In normal-ready mode, real events flow directly into CodeMirror and are
+      // handled natively by @replit/codemirror-vim without manual hijacking.
     };
 
     window.addEventListener("keydown", handleKeyDown, true);

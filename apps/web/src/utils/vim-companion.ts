@@ -190,7 +190,8 @@ export class VimCompanionService {
   public async switchToCommandInput(timeoutMs = 500): Promise<CompanionSwitchResult> {
     // Principle A: Intent Epoch is established immediately before any await
     const epoch = ++this.inputIntentEpoch;
-    const wasAlreadyAvailable = this.availability === "available";
+    const wasUnavailableOrError =
+      this.availability === "unavailable" || this.availability === "error";
 
     // 1. Initial checking await guard
     if (this.availability === "checking" && this.checkPromise) {
@@ -201,7 +202,7 @@ export class VimCompanionService {
     }
 
     // 2. Reconnect probe await guard (probe without entering normal-pending)
-    if (this.availability === "unavailable" || this.availability === "error") {
+    if (wasUnavailableOrError) {
       const probeAvailable = await this.checkAvailability(400);
       if (epoch !== this.inputIntentEpoch) {
         return this.staleSwitchResult();
@@ -220,11 +221,15 @@ export class VimCompanionService {
       return this.staleSwitchResult();
     }
 
-    // If Companion was not already confirmed available at the start of this call,
-    // this call only probes and updates availability. Keep current fallback state
-    // so in-flight multi-key Vim commands (dd, ciw, gg, "ayy) are never interrupted.
+    // If Companion is not available, return fallback
+    if (this.availability !== "available") {
+      return { ok: false, fallback: true };
+    }
+
+    // If Companion was previously unavailable/error and this call only probed reconnection,
+    // keep current fallback state so in-flight multi-key Vim commands are not interrupted.
     // Next explicit Normal acquisition will perform the actual Native switch.
-    if (!wasAlreadyAvailable) {
+    if (wasUnavailableOrError) {
       return { ok: false, fallback: true };
     }
 
