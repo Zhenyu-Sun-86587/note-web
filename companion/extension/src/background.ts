@@ -1,8 +1,9 @@
-import type {
-  NativeHostRequest,
-  NativeHostResponse,
-  VimCompanionBridgeRequest,
-  VimCompanionBridgeResponse,
+import {
+  type NativeHostRequest,
+  type NativeHostResponse,
+  type VimCompanionBridgeRequest,
+  type VimCompanionBridgeResponse,
+  isRestoreReleased,
 } from "./protocol";
 
 const NATIVE_HOST_NAME = "com.noteweb.ime";
@@ -18,14 +19,6 @@ interface PendingRequest {
 }
 
 const pendingRequests = new Map<string, PendingRequest>();
-
-export function isRestoreReleased(resp: VimCompanionBridgeResponse): boolean {
-  if (resp.released !== undefined) return resp.released;
-  if (resp.ok && resp.restored === true) return true;
-  if (resp.ok && resp.restored === false) return true;
-  if (resp.code === "TARGET_GONE") return true;
-  return false;
-}
 
 function getOrCreateNativePort(): chrome.runtime.Port | null {
   if (nativePort) {
@@ -79,7 +72,7 @@ function getOrCreateNativePort(): chrome.runtime.Port | null {
           action: pending.action,
           code: "NATIVE_HOST_DISCONNECTED",
           message: errorMsg,
-          released: true,
+          released: false,
         });
       }
       pendingRequests.clear();

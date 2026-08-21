@@ -9,6 +9,7 @@ import {
 import {
   attachVimImeProxy,
 } from "../utils/vim-ime";
+import { isRestoreReleased } from "../../../../companion/extension/src/protocol";
 import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { vim } from "@replit/codemirror-vim";
@@ -72,6 +73,115 @@ describe("VimCompanionService and State Machine", () => {
     expect(result.verified).toBe(true);
     expect(service.getAvailability()).toBe("available");
     expect(service.getInputState()).toBe("normal-ready");
+  });
+
+  it("P0-A Unit Test 1: Entering INSERT while reconnect ping is in-flight prevents switch_ascii and keeps insert state", async () => {
+    const service = VimCompanionService.getInstance();
+    service._mockSetAvailability("unavailable");
+    service._mockSetInputState("unavailable");
+
+    // 1. Call switchToCommandInput when unavailable -> state immediately normal-pending, ping in-flight
+    const switchPromise = service.switchToCommandInput(500);
+    expect(service.getInputState()).toBe("normal-pending");
+
+    const pingIds = service._mockGetPendingRequestIds();
+    expect(pingIds.length).toBe(1);
+    const pingId = pingIds[0];
+
+    // 2. User enters Insert mode before ping resolves
+    service.restoreTextInput();
+    expect(service.getInputState()).toBe("insert");
+
+    // 3. Late reconnect ping resolves with ok=true
+    service._mockDispatchResponse({
+      id: pingId,
+      ok: true,
+      action: "ping",
+    });
+    await vi.advanceTimersByTimeAsync(10);
+
+    const result = await switchPromise;
+    expect(result.code).toBe("STALE_OPERATION");
+    expect(result.verified).toBe(false);
+
+    // 4. Assert NO switch_ascii request was dispatched!
+    const pendingIdsAfter = service._mockGetPendingRequestIds();
+    expect(pendingIdsAfter.length).toBe(0);
+
+    // 5. Final state must REMAIN insert!
+    expect(service.getInputState()).toBe("insert");
+  });
+
+  it("P0-A Unit Test 2: Entering INSERT while initial checking is in-flight prevents switch_ascii and keeps insert state", async () => {
+    const service = VimCompanionService.getInstance();
+    service._mockSetAvailability("checking");
+    service._mockSetInputState("unavailable");
+
+    // Re-trigger checkAvailability to set in-flight checkPromise
+    const checkPromise = service.checkAvailability(400);
+    const pingIds = service._mockGetPendingRequestIds();
+    expect(pingIds.length).toBe(1);
+    const pingId = pingIds[0];
+
+    // While checking is in-flight, switchToCommandInput is called
+    const switchPromise = service.switchToCommandInput(500);
+    expect(service.getInputState()).toBe("normal-pending");
+
+    // User enters Insert mode before check resolves
+    service.restoreTextInput();
+    expect(service.getInputState()).toBe("insert");
+
+    // Initial checking ping resolves ok
+    service._mockDispatchResponse({
+      id: pingId,
+      ok: true,
+      action: "ping",
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    await checkPromise;
+
+    const result = await switchPromise;
+    expect(result.code).toBe("STALE_OPERATION");
+    expect(result.verified).toBe(false);
+
+    // Assert NO switch_ascii request dispatched (only restore request if any, no switch request)
+    const pendingIdsAfter = service._mockGetPendingRequestIds();
+    expect(pendingIdsAfter.some((id) => id.startsWith("switch-"))).toBe(false);
+
+    // State remains insert
+    expect(service.getInputState()).toBe("insert");
+  });
+
+  it("P0-A Unit Test 3: Reconnect probe timeout does not overwrite INSERT state if user intent changed", async () => {
+    const service = VimCompanionService.getInstance();
+    service._mockSetAvailability("unavailable");
+    service._mockSetInputState("unavailable");
+
+    const switchPromise = service.switchToCommandInput(500);
+    expect(service.getInputState()).toBe("normal-pending");
+
+    // User enters Insert mode
+    service.restoreTextInput();
+    expect(service.getInputState()).toBe("insert");
+
+    // Advance timer to let probe ping time out (60ms)
+    await vi.advanceTimersByTimeAsync(100);
+
+    const result = await switchPromise;
+    expect(result.code).toBe("STALE_OPERATION");
+
+    // State must NOT be overwritten with "unavailable" or "error"!
+    expect(service.getInputState()).toBe("insert");
+  });
+
+  it("P0-B: isRestoreReleased strictly requires verified release and rejects NATIVE_HOST_DISCONNECTED", () => {
+    expect(isRestoreReleased({ ok: true, restored: true, released: true })).toBe(true);
+    expect(isRestoreReleased({ ok: true, restored: false, released: true })).toBe(true);
+    expect(isRestoreReleased({ ok: false, code: "TARGET_GONE", released: true })).toBe(true);
+
+    // UNKNOWN != RELEASED: disconnect synthetic response must evaluate to false
+    expect(isRestoreReleased({ ok: false, code: "NATIVE_HOST_DISCONNECTED", released: false })).toBe(false);
+    expect(isRestoreReleased({ ok: false, code: "RESTORE_UNVERIFIED", released: false })).toBe(false);
   });
 
   it("switchToCommandInput sets state to normal-pending immediately, and normal-ready on ACK", async () => {

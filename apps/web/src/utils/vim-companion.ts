@@ -176,14 +176,37 @@ export class VimCompanionService {
     }
   }
 
+  private staleSwitchResult(
+    message = "Operation was invalidated by subsequent input intent",
+  ): CompanionSwitchResult {
+    return {
+      ok: false,
+      verified: false,
+      code: "STALE_OPERATION",
+      message,
+    };
+  }
+
   public async switchToCommandInput(timeoutMs = 500): Promise<CompanionSwitchResult> {
+    // P0-A: Intent Epoch and normal-pending established immediately before any await
+    const epoch = ++this.inputIntentEpoch;
+    this.inputState = "normal-pending";
+    this.notify();
+
+    // 1. Initial checking await guard
     if (this.availability === "checking" && this.checkPromise) {
       await this.checkPromise;
+      if (epoch !== this.inputIntentEpoch) {
+        return this.staleSwitchResult();
+      }
     }
 
-    // P0-1: On-demand lightweight reconnect probe when previously unavailable or error
+    // 2. Reconnect probe await guard
     if (this.availability === "unavailable" || this.availability === "error") {
-      const probeAvailable = await this.checkAvailability(300);
+      const probeAvailable = await this.checkAvailability(60);
+      if (epoch !== this.inputIntentEpoch) {
+        return this.staleSwitchResult();
+      }
       if (!probeAvailable) {
         this.inputState = "unavailable";
         this.notify();
@@ -191,11 +214,7 @@ export class VimCompanionService {
       }
     }
 
-    // P0-2: Intent Epoch update
-    const epoch = ++this.inputIntentEpoch;
-    this.inputState = "normal-pending";
-    this.notify();
-
+    // 3. Switch request
     const id = `switch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     try {
       const resp = await this.sendRequest<{
@@ -214,14 +233,9 @@ export class VimCompanionService {
         timeoutMs,
       );
 
-      // P0-2: Stale ACK Guard - If intent changed while request was in-flight, discard without mutating state
+      // Stale ACK Guard - If intent changed while request was in-flight, discard without mutating state
       if (epoch !== this.inputIntentEpoch) {
-        return {
-          ok: false,
-          verified: false,
-          code: "STALE_OPERATION",
-          message: "Operation was invalidated by subsequent user intent",
-        };
+        return this.staleSwitchResult();
       }
 
       if (resp && resp.ok && resp.verified === true) {
@@ -244,12 +258,7 @@ export class VimCompanionService {
       };
     } catch (err: any) {
       if (epoch !== this.inputIntentEpoch) {
-        return {
-          ok: false,
-          verified: false,
-          code: "STALE_OPERATION",
-          message: "Operation timed out after intent changed",
-        };
+        return this.staleSwitchResult("Operation timed out after intent changed");
       }
       this.inputState = "error";
       this.notify();

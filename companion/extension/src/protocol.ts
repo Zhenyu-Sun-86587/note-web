@@ -46,3 +46,16 @@ export interface NativeHostResponse {
   restored?: boolean;
   released?: boolean;
 }
+
+export function isRestoreReleased(resp: {
+  released?: boolean;
+  ok?: boolean;
+  restored?: boolean;
+  code?: string;
+}): boolean {
+  if (resp.released !== undefined) return resp.released;
+  if (resp.ok && resp.restored === true) return true;
+  if (resp.ok && resp.restored === false) return true;
+  if (resp.code === "TARGET_GONE") return true;
+  return false;
+}

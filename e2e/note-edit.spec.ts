@@ -80,6 +80,15 @@ test.describe("Note Web E2E Suite", () => {
     // Wait for the main shell and editor to be ready
     await expect(page).toHaveTitle(/Note Web/);
 
+    // If starting in VIM mode from previous run, toggle to IR mode
+    const irBtn = page.locator(".editor-mode-toggle .mode-btn", { hasText: "IR" });
+    if (await irBtn.isVisible()) {
+      const isIrActive = await irBtn.evaluate((el) => el.classList.contains("active"));
+      if (!isIrActive) {
+        await irBtn.click();
+      }
+    }
+
     // Wait for note content to be loaded in editor
     const editorContainer = page.locator(".vditor-ir .vditor-reset");
     await expect(editorContainer).toBeVisible({ timeout: 10000 });
@@ -662,6 +671,7 @@ test.describe("Note Web E2E Suite", () => {
     // 2. Type in VIM (in Insert mode) and immediately switch to IR
     const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
     await cmContent.click();
+    await page.waitForTimeout(350);
     await page.keyboard.press("i");
     await expect(vimPanel).toContainText("INSERT");
     await page.keyboard.type(" ImmediateVimText");
@@ -695,6 +705,7 @@ test.describe("Note Web E2E Suite", () => {
 
     // Focus editor and verify NORMAL mode
     await cmContent.click();
+    await page.waitForTimeout(350);
     await expect(vimPanel).toContainText("NORMAL");
 
     // Insert a test line
@@ -702,6 +713,7 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("o");
     await page.keyboard.type("firstword secondword thirdword");
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
     await expect(vimPanel).toContainText("NORMAL");
     await expect(cmContent).toContainText("firstword secondword thirdword");
 
@@ -1507,6 +1519,7 @@ test.describe("Note Web E2E Suite", () => {
     const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
     await expect(cmContent).toBeVisible();
     await cmContent.click();
+    await page.waitForTimeout(200);
 
     // 3. Press i, type text, then type jj
     await page.keyboard.press("i");
@@ -1534,6 +1547,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
 
     // Go to top and set mark 'a'
     await page.keyboard.press("g");
@@ -1571,6 +1585,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
 
     // 1. Yank first line into register 'a': "ayy
     await page.keyboard.press("g");
@@ -1613,6 +1628,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
 
     // 1. Insert 4 new sample lines: itemalpha, itembeta, itemgamma, itemdelta
     await page.keyboard.press("G");
@@ -1625,6 +1641,7 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("Enter");
     await page.keyboard.type("itemdelta");
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
 
     // 2. Move cursor up to itemalpha: 3k
     await page.keyboard.press("3");
@@ -1636,6 +1653,7 @@ test.describe("Note Web E2E Suite", () => {
     await page.keyboard.press("I");
     await page.keyboard.type("- ");
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
     await page.keyboard.press("j");
     await page.keyboard.press("q");
 
@@ -1670,6 +1688,7 @@ test.describe("Note Web E2E Suite", () => {
     await expect(cmContent).toBeVisible();
     await cmContent.click();
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
 
     // 1. Record macro 'a' with Backspace: qa i abc <Backspace> d <Escape> q -> inserts "abd"
     await page.keyboard.press("G");
@@ -2122,7 +2141,9 @@ test.describe("Note Web E2E Suite", () => {
 
     // Switch to IR mode
     await irBtn.click();
-    await expect(page.locator(".vditor-ir .vditor-reset")).toBeVisible();
+    await expect(page.locator(".vditor-ir .vditor-reset")).toBeVisible({
+      timeout: 10000,
+    });
 
     // Verify restore was called when switching from Vim to IR
     const calls = await page.evaluate(() => (window as any).__mockCalls || []);
@@ -2190,7 +2211,10 @@ test.describe("Note Web E2E Suite", () => {
 
     // Simulate native disconnected
     await page.evaluate(() => {
-      (window as any).__setDisconnected(true);
+      (window as any).__companionDisconnected = true;
+      if (typeof (window as any).__setDisconnected === "function") {
+        (window as any).__setDisconnected(true);
+      }
       window.postMessage(
         {
           source: "note-web-companion",
@@ -2207,7 +2231,10 @@ test.describe("Note Web E2E Suite", () => {
 
     // Native host reconnects
     await page.evaluate(() => {
-      (window as any).__setDisconnected(false);
+      (window as any).__companionDisconnected = false;
+      if (typeof (window as any).__setDisconnected === "function") {
+        (window as any).__setDisconnected(false);
+      }
     });
 
     // Enter insert mode then back to Normal mode to trigger reconnect probe
