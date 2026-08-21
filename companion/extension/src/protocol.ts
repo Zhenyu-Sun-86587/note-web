@@ -22,6 +22,7 @@ export interface VimCompanionBridgeResponse {
   message?: string;
   code?: string;
   restored?: boolean;
+  released?: boolean;
   type?: "native-state-invalidated" | "native-disconnected";
   reason?: string;
 }
@@ -43,4 +44,5 @@ export interface NativeHostResponse {
   message?: string;
   code?: string;
   restored?: boolean;
+  released?: boolean;
 }

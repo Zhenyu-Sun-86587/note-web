@@ -19,6 +19,14 @@ interface PendingRequest {
 
 const pendingRequests = new Map<string, PendingRequest>();
 
+export function isRestoreReleased(resp: VimCompanionBridgeResponse): boolean {
+  if (resp.released !== undefined) return resp.released;
+  if (resp.ok && resp.restored === true) return true;
+  if (resp.ok && resp.restored === false) return true;
+  if (resp.code === "TARGET_GONE") return true;
+  return false;
+}
+
 function getOrCreateNativePort(): chrome.runtime.Port | null {
   if (nativePort) {
     return nativePort;
@@ -49,6 +57,7 @@ function getOrCreateNativePort(): chrome.runtime.Port | null {
           message: msg.message,
           code: msg.code,
           restored: msg.restored,
+          released: msg.released,
         };
         pending.resolve(bridgeResp);
       }
@@ -70,6 +79,7 @@ function getOrCreateNativePort(): chrome.runtime.Port | null {
           action: pending.action,
           code: "NATIVE_HOST_DISCONNECTED",
           message: errorMsg,
+          released: true,
         });
       }
       pendingRequests.clear();
@@ -78,7 +88,7 @@ function getOrCreateNativePort(): chrome.runtime.Port | null {
       nativePort = null;
       ownerTabId = null;
 
-      // P0-4: Notify current owner page that native port disconnected
+      // Notify current owner page that native port disconnected
       if (oldOwnerTabId !== null && typeof chrome.tabs !== "undefined") {
         try {
           chrome.tabs.sendMessage(oldOwnerTabId, {
@@ -172,7 +182,7 @@ chrome.runtime.onMessage.addListener(
 
     // Handle switch_ascii requests
     if (message.action === "switch_ascii") {
-      // P1-3: Verify sender tab exists and is active
+      // Verify sender tab exists and is active
       if (!senderTab || senderTabId === null) {
         sendResponse({
           source: "note-web-companion",
@@ -199,33 +209,14 @@ chrome.runtime.onMessage.addListener(
         return false;
       }
 
-      // Check window focus if windows API is available
       const proceedWithSwitch = () => {
-        // P1-2: Ownership Transfer with verification
+        // Ownership Transfer with verification
         if (ownerTabId !== null && ownerTabId !== senderTabId) {
           sendToNativeHost({
             id: `transfer-restore-${Date.now()}`,
             action: "restore",
           }).then((restoreResp) => {
-            if (restoreResp.ok && restoreResp.restored !== false) {
-              // Notify previous owner that its command state is invalidated
-              try {
-                chrome.tabs.sendMessage(ownerTabId!, {
-                  source: "note-web-companion",
-                  channel: "vim-ime",
-                  type: "native-state-invalidated",
-                  reason: "owner-transferred",
-                });
-              } catch {}
-
-              ownerTabId = senderTabId;
-              sendToNativeHost({
-                id: message.id,
-                action: message.action,
-              }).then((resp) => {
-                sendResponse(resp);
-              });
-            } else {
+            if (!isRestoreReleased(restoreResp)) {
               sendResponse({
                 source: "note-web-companion",
                 channel: "vim-ime",
@@ -235,16 +226,44 @@ chrome.runtime.onMessage.addListener(
                 code: "OWNER_RESTORE_FAILED",
                 message: "Failed to restore previous owner tab IME state before switching",
               });
+              return;
             }
+
+            const oldOwner = ownerTabId;
+            ownerTabId = null;
+
+            // Notify previous owner that its command state is invalidated
+            if (oldOwner !== null) {
+              try {
+                chrome.tabs.sendMessage(oldOwner, {
+                  source: "note-web-companion",
+                  channel: "vim-ime",
+                  type: "native-state-invalidated",
+                  reason: "owner-transferred",
+                });
+              } catch {}
+            }
+
+            sendToNativeHost({
+              id: message.id,
+              action: message.action,
+            }).then((resp) => {
+              if (resp.ok && resp.verified === true) {
+                ownerTabId = senderTabId;
+              }
+              sendResponse(resp);
+            });
           });
           return;
         }
 
-        ownerTabId = senderTabId;
         sendToNativeHost({
           id: message.id,
           action: message.action,
         }).then((resp) => {
+          if (resp.ok && resp.verified === true) {
+            ownerTabId = senderTabId;
+          }
           sendResponse(resp);
         });
       };
@@ -273,9 +292,16 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message.action === "restore" && senderTabId !== null) {
-      if (ownerTabId === senderTabId) {
-        ownerTabId = null;
-      }
+      sendToNativeHost({
+        id: message.id,
+        action: message.action,
+      }).then((resp) => {
+        if (isRestoreReleased(resp) && ownerTabId === senderTabId) {
+          ownerTabId = null;
+        }
+        sendResponse(resp);
+      });
+      return true;
     }
 
     sendToNativeHost({

@@ -32,6 +32,7 @@ export class VimCompanionService {
 
   private availability: CompanionAvailability = "checking";
   private inputState: VimNativeInputState = "unavailable";
+  private inputIntentEpoch = 0;
   private listeners = new Set<() => void>();
   private pendingRequests = new Map<
     string,
@@ -71,6 +72,7 @@ export class VimCompanionService {
 
       // Handle unsolicited native state invalidations / disconnections
       if (data.type === "native-state-invalidated" || data.type === "native-disconnected") {
+        ++this.inputIntentEpoch;
         if (data.type === "native-disconnected") {
           this.availability = "unavailable";
           this.inputState = "unavailable";
@@ -96,46 +98,57 @@ export class VimCompanionService {
   }
 
   public invalidateNativeState(_reason?: string) {
+    ++this.inputIntentEpoch;
     if (this.inputState === "normal-ready") {
       this.inputState = "normal-pending";
       this.notify();
     }
   }
 
-  public async checkAvailability(timeoutMs = 400): Promise<boolean> {
+  public checkAvailability(timeoutMs = 400): Promise<boolean> {
     if (typeof window === "undefined") {
       this.availability = "unavailable";
       this.inputState = "unavailable";
-      return false;
+      return Promise.resolve(false);
     }
 
-    try {
-      const id = `ping-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const res = await this.sendRequest<{ ok: boolean; action: string }>(
-        {
-          source: "note-web",
-          channel: "vim-ime",
-          id,
-          action: "ping",
-        },
-        timeoutMs,
-      );
+    if (this.checkPromise) {
+      return this.checkPromise;
+    }
 
-      if (res && res.ok) {
-        this.availability = "available";
-        this.notify();
-        return true;
+    this.checkPromise = (async () => {
+      try {
+        const id = `ping-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const res = await this.sendRequest<{ ok: boolean; action: string }>(
+          {
+            source: "note-web",
+            channel: "vim-ime",
+            id,
+            action: "ping",
+          },
+          timeoutMs,
+        );
+
+        if (res && res.ok) {
+          this.availability = "available";
+          this.notify();
+          return true;
+        }
+      } catch {
+        // Ping timed out or failed
+      } finally {
+        this.checkPromise = null;
       }
-    } catch {
-      // Ping timed out or failed
-    }
 
-    this.availability = "unavailable";
-    if (this.inputState === "normal-pending") {
-      this.inputState = "unavailable";
-    }
-    this.notify();
-    return false;
+      this.availability = "unavailable";
+      if (this.inputState === "normal-pending") {
+        this.inputState = "unavailable";
+      }
+      this.notify();
+      return false;
+    })();
+
+    return this.checkPromise;
   }
 
   public getAvailability(): CompanionAvailability {
@@ -168,12 +181,18 @@ export class VimCompanionService {
       await this.checkPromise;
     }
 
-    if (this.availability === "unavailable") {
-      this.inputState = "unavailable";
-      this.notify();
-      return { ok: false, fallback: true };
+    // P0-1: On-demand lightweight reconnect probe when previously unavailable or error
+    if (this.availability === "unavailable" || this.availability === "error") {
+      const probeAvailable = await this.checkAvailability(300);
+      if (!probeAvailable) {
+        this.inputState = "unavailable";
+        this.notify();
+        return { ok: false, fallback: true };
+      }
     }
 
+    // P0-2: Intent Epoch update
+    const epoch = ++this.inputIntentEpoch;
     this.inputState = "normal-pending";
     this.notify();
 
@@ -195,6 +214,16 @@ export class VimCompanionService {
         timeoutMs,
       );
 
+      // P0-2: Stale ACK Guard - If intent changed while request was in-flight, discard without mutating state
+      if (epoch !== this.inputIntentEpoch) {
+        return {
+          ok: false,
+          verified: false,
+          code: "STALE_OPERATION",
+          message: "Operation was invalidated by subsequent user intent",
+        };
+      }
+
       if (resp && resp.ok && resp.verified === true) {
         this.inputState = "normal-ready";
         this.notify();
@@ -214,6 +243,14 @@ export class VimCompanionService {
         message: resp?.message || "Input switch could not be verified",
       };
     } catch (err: any) {
+      if (epoch !== this.inputIntentEpoch) {
+        return {
+          ok: false,
+          verified: false,
+          code: "STALE_OPERATION",
+          message: "Operation timed out after intent changed",
+        };
+      }
       this.inputState = "error";
       this.notify();
       return {
@@ -226,6 +263,8 @@ export class VimCompanionService {
   }
 
   public async restoreTextInput(timeoutMs = 500): Promise<CompanionRestoreResult> {
+    // P0-2: Increments epoch so any in-flight switch cannot resurrect normal-ready
+    ++this.inputIntentEpoch;
     this.inputState = "insert";
     this.notify();
 
@@ -295,12 +334,34 @@ export class VimCompanionService {
   public _mockSetAvailability(availability: CompanionAvailability) {
     this.availability = availability;
     this.checkPromise = null;
+    for (const pending of this.pendingRequests.values()) {
+      clearTimeout(pending.timer);
+    }
+    this.pendingRequests.clear();
     this.notify();
   }
 
   public _mockSetInputState(state: VimNativeInputState) {
     this.inputState = state;
     this.notify();
+  }
+
+  public _mockGetPendingRequestIds(): string[] {
+    return Array.from(this.pendingRequests.keys());
+  }
+
+  public _mockDispatchResponse(response: Record<string, any>) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: {
+            source: "note-web-companion",
+            channel: "vim-ime",
+            ...response,
+          },
+        }),
+      );
+    }
   }
 }
 

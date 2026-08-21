@@ -2129,5 +2129,95 @@ test.describe("Note Web E2E Suite", () => {
     const restoreCalls = calls.filter((c: any) => c.action === "restore");
     expect(restoreCalls.length).toBeGreaterThanOrEqual(1);
   });
+
+  test("Vim IME Companion E2E: Disconnection invalidates normal-ready, and subsequent Normal mode entry triggers lightweight reconnect", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (window as any).__mockCalls = [];
+      let isDisconnected = false;
+      (window as any).__setDisconnected = (val: boolean) => {
+        isDisconnected = val;
+      };
+
+      window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (data && data.source === "note-web" && data.channel === "vim-ime") {
+          (window as any).__mockCalls.push(data);
+
+          if (isDisconnected) {
+            return;
+          }
+
+          if (data.action === "ping") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "ping",
+              },
+              "*",
+            );
+          } else if (data.action === "switch_ascii") {
+            window.postMessage(
+              {
+                source: "note-web-companion",
+                channel: "vim-ime",
+                id: data.id,
+                ok: true,
+                action: "switch_ascii",
+                strategy: "keyboard_layout",
+                verified: true,
+              },
+              "*",
+            );
+          }
+        }
+      });
+    });
+
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+    await expect(page.locator(".note-web-vim-editor")).toBeVisible();
+
+    const imeStatus = page.locator(".note-web-vim-ime-status");
+    await expect(imeStatus).toContainText("IME Auto");
+
+    // Simulate native disconnected
+    await page.evaluate(() => {
+      (window as any).__setDisconnected(true);
+      window.postMessage(
+        {
+          source: "note-web-companion",
+          channel: "vim-ime",
+          type: "native-disconnected",
+          reason: "port-disconnected",
+        },
+        "*",
+      );
+    });
+
+    // IME status should show IME Fallback
+    await expect(imeStatus).toContainText("IME Fallback");
+
+    // Native host reconnects
+    await page.evaluate(() => {
+      (window as any).__setDisconnected(false);
+    });
+
+    // Enter insert mode then back to Normal mode to trigger reconnect probe
+    const vimEditor = page.locator(".note-web-vim-editor .cm-content");
+    await vimEditor.click();
+    await page.keyboard.type("i");
+    await page.keyboard.press("Escape");
+
+    // Reconnected successfully -> IME Auto
+    await expect(imeStatus).toContainText("IME Auto");
+  });
 });
 

@@ -43,6 +43,8 @@ pub struct NativeResponse {
     pub code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub restored: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub released: Option<bool>,
 }
 
 impl NativeResponse {
@@ -59,6 +61,7 @@ impl NativeResponse {
             message: None,
             code: None,
             restored: None,
+            released: None,
         }
     }
 
@@ -75,6 +78,7 @@ impl NativeResponse {
             message: Some(message.to_string()),
             code: Some(code.to_string()),
             restored: None,
+            released: None,
         }
     }
 }
@@ -109,11 +113,13 @@ mod tests {
         resp.target_pid = Some(1234);
         resp.target_hwnd = Some("0x1234".to_string());
         resp.elapsed_ms = Some(15);
+        resp.released = Some(true);
 
         let json = serde_json::to_string(&resp).expect("serialize success");
         assert!(json.contains(r#""strategy":"keyboard_layout""#));
         assert!(json.contains(r#""targetPid":1234"#));
         assert!(json.contains(r#""verified":true"#));
+        assert!(json.contains(r#""released":true"#));
 
         let err_resp = NativeResponse::error(
             "req-2",
