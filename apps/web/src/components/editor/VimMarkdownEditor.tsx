@@ -18,7 +18,7 @@ import {
   highlightSpecialChars,
   keymap,
 } from "@codemirror/view";
-import { EditorState, Transaction, Compartment } from "@codemirror/state";
+import { EditorState, Transaction, Compartment, Prec } from "@codemirror/state";
 import {
   defaultHighlightStyle,
   syntaxHighlighting,
@@ -53,9 +53,11 @@ import {
   attachVimImeProxy,
   updateProxyPosition,
   isVimDialogActive,
+  forwardKeyToVim,
 } from "../../utils/vim-ime";
 import {
   setupVimKeymaps,
+  isVimOwnedCtrlChord,
 } from "../../utils/vim-keyboard";
 import {
   vimCompanion,
@@ -361,43 +363,60 @@ export const VimMarkdownEditor = forwardRef<
         syncVimDialogState();
       });
 
-      // DOM event handlers for CodeMirror
-      const vimDomHandlers = EditorView.domEventHandlers({
-        focus: (_e, view) => {
-          const currentCm = getCM(view);
-          const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
-          const compState = vimCompanion.getInputState();
-          if (
-            !isInsertOrReplace &&
-            !isVimDialogActive(currentCm, view) &&
-            compState !== "normal-ready"
-          ) {
-            proxyRef.current?.focus();
-            updateProxyPosition(view, proxyRef.current, containerRef.current);
-          }
-          return false;
-        },
-        click: (_e, view) => {
-          const currentCm = getCM(view);
-          const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
-          const compState = vimCompanion.getInputState();
-          if (
-            !isInsertOrReplace &&
-            !isVimDialogActive(currentCm, view) &&
-            compState !== "normal-ready"
-          ) {
-            proxyRef.current?.focus();
-            updateProxyPosition(view, proxyRef.current, containerRef.current);
-          }
-          return false;
-        },
-        keydown: (e, _view) => {
-          if (e.key === "q" || e.key === "Escape") {
-            queueMicrotask(persistVimSession);
-          }
-          return false;
-        },
-      });
+      // DOM event handlers for CodeMirror (Prec.highest ensures Vim Ctrl chords are unconditionally prevented from leaking to browser)
+      const vimDomHandlers = Prec.highest(
+        EditorView.domEventHandlers({
+          focus: (_e, view) => {
+            const currentCm = getCM(view);
+            const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+            const compState = vimCompanion.getInputState();
+            if (
+              !isInsertOrReplace &&
+              !isVimDialogActive(currentCm, view) &&
+              compState !== "normal-ready"
+            ) {
+              proxyRef.current?.focus();
+              updateProxyPosition(view, proxyRef.current, containerRef.current);
+            }
+            return false;
+          },
+          click: (_e, view) => {
+            const currentCm = getCM(view);
+            const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+            const compState = vimCompanion.getInputState();
+            if (
+              !isInsertOrReplace &&
+              !isVimDialogActive(currentCm, view) &&
+              compState !== "normal-ready"
+            ) {
+              proxyRef.current?.focus();
+              updateProxyPosition(view, proxyRef.current, containerRef.current);
+            }
+            return false;
+          },
+          keydown: (e, view) => {
+            if (e.key === "q" || e.key === "Escape") {
+              queueMicrotask(persistVimSession);
+            }
+
+            const currentCm = getCM(view);
+            const isInsert = Boolean(currentCm?.state?.vim?.insertMode);
+            const isDialog = isVimDialogActive(currentCm, view);
+
+            // In NORMAL or VISUAL mode: Unconditionally intercept Vim-owned Ctrl chords
+            // (Ctrl+R Redo, Ctrl+F PageDown, Ctrl+B PageUp, Ctrl+D/U HalfPage, Ctrl+W, etc.)
+            // so browser never intercepts with page refresh, find, bookmarks, or closing tab.
+            if (!isInsert && !isDialog && isVimOwnedCtrlChord(e)) {
+              e.preventDefault();
+              e.stopPropagation();
+              forwardKeyToVim(view, e);
+              return true;
+            }
+
+            return false;
+          },
+        }),
+      );
 
       const themeExtension = EditorView.theme({
         "&": {

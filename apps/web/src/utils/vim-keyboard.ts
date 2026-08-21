@@ -110,9 +110,10 @@ export function isVimOwnedCtrlChord(e: {
   ctrlKey?: boolean;
   altKey?: boolean;
   metaKey?: boolean;
+  shiftKey?: boolean;
   code?: string;
 }): boolean {
-  if (!e.ctrlKey || e.altKey || e.metaKey) {
+  if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) {
     return false;
   }
   const key = e.key.toLowerCase();
