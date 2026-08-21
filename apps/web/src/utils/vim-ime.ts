@@ -266,7 +266,16 @@ export function attachVimImeProxy(
       return;
     }
 
-    // Non-printable or Ctrl chords: execute immediately with unconditional preventDefault / stopPropagation
+    // Ctrl chords are handled at window capture level.
+    // If an event reaches here, prevent default & stop propagation so browser doesn't grab it, but do not forward twice.
+    if (isVimCtrlChord(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      imeState.pendingPrintableKey = null;
+      return;
+    }
+
+    // Non-printable navigation/editing keys (Escape, Enter, Backspace, Arrows, etc.): execute immediately
     if (isNonPrintableOrControlKey(e)) {
       e.preventDefault();
       e.stopPropagation();

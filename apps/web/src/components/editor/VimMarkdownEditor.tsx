@@ -53,6 +53,7 @@ import {
   attachVimImeProxy,
   updateProxyPosition,
   isVimDialogActive,
+  isVimCtrlChord,
   isNonPrintableOrControlKey,
   forwardKeyToVim,
 } from "../../utils/vim-ime";
@@ -553,43 +554,78 @@ export const VimMarkdownEditor = forwardRef<
       window.addEventListener("focus", handleVisibilityOrFocus);
 
       const handleWindowKeyDown = (e: KeyboardEvent) => {
-        if (e.target === proxyRef.current) return;
+        const isMac =
+          typeof navigator !== "undefined" &&
+          /Macintosh|Mac OS X/i.test(navigator.userAgent);
+
+        // 1. App Save: Cmd+S on Mac, Ctrl+S elsewhere (Global top capture priority)
+        const isSave =
+          (isMac ? e.metaKey : e.ctrlKey) &&
+          !e.shiftKey &&
+          !e.altKey &&
+          e.key.toLowerCase() === "s";
+        if (isSave) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          onSaveRef.current?.();
+          return;
+        }
+
+        // 2. If target is a standard INPUT or non-proxy TEXTAREA (e.g. search box, modal), do not intercept
         const target = e.target as HTMLElement;
-        if (
+        const isOtherInput =
           target &&
           (target.tagName === "INPUT" ||
             (target.tagName === "TEXTAREA" &&
-              !target.classList.contains("note-web-vim-ime-proxy")))
-        ) {
+              !target.classList.contains("note-web-vim-ime-proxy")));
+        if (isOtherInput) {
           return;
         }
-        const currentCm = getCM(view);
+
+        if (!viewRef.current) return;
+        const currentCm = getCM(viewRef.current);
         const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
-        if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
-          const isMac =
-            typeof navigator !== "undefined" &&
-            /Macintosh|Mac OS X/i.test(navigator.userAgent);
+        const isDialog = isVimDialogActive(currentCm, viewRef.current);
 
-          // App Save: Cmd+S on Mac, Ctrl+S elsewhere
-          const isSave =
-            (isMac ? e.metaKey : e.ctrlKey) &&
-            !e.shiftKey &&
-            !e.altKey &&
-            e.key.toLowerCase() === "s";
-          if (isSave) {
-            e.preventDefault();
-            e.stopPropagation();
-            onSaveRef.current?.();
-            return;
+        // 3. Search / Ex / Insert modes must NOT be intercepted
+        if (isInsertOrReplace || isDialog) {
+          return;
+        }
+
+        // 4. In NORMAL / VISUAL mode: Intercept all Vim Ctrl chords at window capture level BEFORE proxy early-return
+        if (isVimCtrlChord(e)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (e.key === "q" || e.key === "Escape") {
+            queueMicrotask(persistVimSession);
           }
-
           proxyRef.current?.focus();
-          updateProxyPosition(view, proxyRef.current, containerRef.current);
-          if (isNonPrintableOrControlKey(e)) {
-            e.preventDefault();
-            e.stopPropagation();
-            forwardKeyToVim(view, e);
-          }
+          updateProxyPosition(
+            viewRef.current,
+            proxyRef.current,
+            containerRef.current,
+          );
+          forwardKeyToVim(viewRef.current, e);
+          return;
+        }
+
+        // 5. If target is proxy element, return and let proxy handler deal with printable keys / navigation
+        if (e.target === proxyRef.current) {
+          return;
+        }
+
+        // 6. Focus outside proxy in NORMAL/VISUAL mode (e.g. clicked editor container or document):
+        // Pull focus back to proxy and forward non-printable keys
+        proxyRef.current?.focus();
+        updateProxyPosition(
+          viewRef.current,
+          proxyRef.current,
+          containerRef.current,
+        );
+        if (isNonPrintableOrControlKey(e)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          forwardKeyToVim(viewRef.current, e);
         }
       };
       window.addEventListener("keydown", handleWindowKeyDown, true);
