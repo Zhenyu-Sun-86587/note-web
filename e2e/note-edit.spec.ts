@@ -2240,5 +2240,81 @@ test.describe("Note Web E2E Suite", () => {
     // Reconnected successfully -> IME Auto
     await expect(imeStatus).toContainText("IME Auto");
   });
+
+  test("Vim keyboard ownership: NORMAL/VISUAL mode prevents browser default actions for Ctrl+R, Ctrl+F, Ctrl+P and executes Vim commands", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const vimBtn = page.locator(".editor-mode-toggle .mode-btn", {
+      hasText: "VIM",
+    });
+    await vimBtn.click();
+
+    const cmContent = page.locator(".note-web-vim-editor .cm-content");
+    const vimPanel = page.locator(".note-web-vim-editor .cm-vim-panel");
+    await expect(cmContent).toBeVisible({ timeout: 10000 });
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // 1. Focus editor in NORMAL mode
+    await cmContent.click();
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // Set page session markers and spies
+    await page.evaluate(() => {
+      (window as any).__e2e_page_marker = "active_session_123";
+      (window as any).__print_call_count = 0;
+      window.print = () => {
+        (window as any).__print_call_count++;
+      };
+    });
+
+    // 2. Insert test line
+    await page.keyboard.press("G");
+    await page.keyboard.press("o");
+    await page.keyboard.type("firstword secondword thirdword");
+    await page.keyboard.press("Escape");
+    await expect(vimPanel).toContainText("NORMAL");
+    await expect(cmContent).toContainText("firstword secondword thirdword");
+
+    // 3. Test Ctrl+R (Redo) without page reload:
+    // Delete firstword with dw
+    await page.keyboard.press("0");
+    await page.keyboard.press("d");
+    await page.keyboard.press("w");
+    await expect(cmContent).not.toContainText("firstword");
+    await expect(cmContent).toContainText("secondword thirdword");
+
+    // Undo with u
+    await page.keyboard.press("u");
+    await expect(cmContent).toContainText("firstword secondword thirdword");
+
+    // Press Control+r for Vim Redo
+    await page.keyboard.press("Control+r");
+    // Verify firstword was deleted again via Vim redo
+    await expect(cmContent).not.toContainText("firstword");
+    await expect(cmContent).toContainText("secondword thirdword");
+
+    // Verify page did NOT reload (session marker intact)
+    const marker = await page.evaluate(() => (window as any).__e2e_page_marker);
+    expect(marker).toBe("active_session_123");
+
+    // 4. Test Ctrl+P (Previous Line / motion in Vim) without triggering browser print
+    await page.keyboard.press("Control+p");
+    const printCalls = await page.evaluate(
+      () => (window as any).__print_call_count,
+    );
+    expect(printCalls).toBe(0);
+
+    // 5. Test Ctrl+F (Page Down / scroll in Vim)
+    await page.keyboard.press("Control+f");
+    // Focus remains in proxy and NORMAL mode remains active
+    await expect(vimPanel).toContainText("NORMAL");
+
+    // 6. Test Ctrl+S executes app save
+    await page.keyboard.press("Control+s");
+    const statusBar = page.locator(".statusbar");
+    await expect(statusBar).toContainText("已保存", { timeout: 8000 });
+  });
 });
+
 

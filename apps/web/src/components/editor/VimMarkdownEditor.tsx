@@ -339,15 +339,19 @@ export const VimMarkdownEditor = forwardRef<
           }
           return false;
         },
-        keydown: (e, _view) => {
+        keydown: (e, view) => {
           // Narrow fallback persist if recording macro q or Escape
           if (e.key === "q" || e.key === "Escape") {
             queueMicrotask(persistVimSession);
           }
 
+          const isMac =
+            typeof navigator !== "undefined" &&
+            /Macintosh|Mac OS X/i.test(navigator.userAgent);
+
           // App Save: Cmd+S on Mac, Ctrl+S elsewhere
           const isSave =
-            (e.metaKey || e.ctrlKey) &&
+            (isMac ? e.metaKey : e.ctrlKey) &&
             !e.shiftKey &&
             !e.altKey &&
             e.key.toLowerCase() === "s";
@@ -358,39 +362,16 @@ export const VimMarkdownEditor = forwardRef<
             return true;
           }
 
-          // Vim Control chords: ALWAYS e.ctrlKey (never metaKey / Mac Command)
-          if (e.ctrlKey && !e.metaKey && !e.altKey) {
-            const key = e.key.toLowerCase();
-            const vimHijackCtrlKeys = new Set([
-              "r",
-              "p",
-              "f",
-              "b",
-              "d",
-              "u",
-              "o",
-              "n",
-              "w",
-              "a",
-              "e",
-              "y",
-              "v",
-              "[",
-              "]",
-              "c",
-              "h",
-              "j",
-              "k",
-              "l",
-              "g",
-              "t",
-              "i",
-              "m",
-              "q",
-            ]);
-            if (vimHijackCtrlKeys.has(key)) {
-              e.preventDefault();
-            }
+          const currentCm = getCM(view);
+          const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
+          const isDialog = isVimDialogActive(currentCm, view);
+
+          // In Normal / Visual mode (if key reached CodeMirror directly), prevent browser default and forward
+          if (!isInsertOrReplace && !isDialog && isNonPrintableOrControlKey(e)) {
+            e.preventDefault();
+            e.stopPropagation();
+            forwardKeyToVim(view, e);
+            return true;
           }
 
           return false;
@@ -585,6 +566,23 @@ export const VimMarkdownEditor = forwardRef<
         const currentCm = getCM(view);
         const isInsertOrReplace = Boolean(currentCm?.state?.vim?.insertMode);
         if (!isInsertOrReplace && !isVimDialogActive(currentCm, view)) {
+          const isMac =
+            typeof navigator !== "undefined" &&
+            /Macintosh|Mac OS X/i.test(navigator.userAgent);
+
+          // App Save: Cmd+S on Mac, Ctrl+S elsewhere
+          const isSave =
+            (isMac ? e.metaKey : e.ctrlKey) &&
+            !e.shiftKey &&
+            !e.altKey &&
+            e.key.toLowerCase() === "s";
+          if (isSave) {
+            e.preventDefault();
+            e.stopPropagation();
+            onSaveRef.current?.();
+            return;
+          }
+
           proxyRef.current?.focus();
           updateProxyPosition(view, proxyRef.current, containerRef.current);
           if (isNonPrintableOrControlKey(e)) {

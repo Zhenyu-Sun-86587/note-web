@@ -1,9 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   isAsciiPrintable,
+  isVimCtrlChord,
   isNonPrintableOrControlKey,
   createVimImeState,
+  attachVimImeProxy,
 } from "../utils/vim-ime";
+import { EditorView } from "@codemirror/view";
+import { EditorState } from "@codemirror/state";
+import { vim } from "@replit/codemirror-vim";
 
 describe("Vim IME Isolation Utilities", () => {
   describe("isAsciiPrintable", () => {
@@ -27,6 +32,35 @@ describe("Vim IME Isolation Utilities", () => {
     });
   });
 
+  describe("isVimCtrlChord", () => {
+    it("recognizes all specified Vim Ctrl chords", () => {
+      const vimChords = [
+        "r", "f", "b", "d", "u", "p", "n", "w", "a", "e", "y", "v",
+        "[", "]", "c", "h", "j", "k", "l", "g", "t", "i", "m", "q",
+        "o", "x",
+      ];
+
+      for (const key of vimChords) {
+        expect(isVimCtrlChord({ key, ctrlKey: true })).toBe(true);
+        expect(isVimCtrlChord({ key: key.toUpperCase(), ctrlKey: true })).toBe(true);
+      }
+
+      expect(isVimCtrlChord({ key: "[", code: "BracketLeft", ctrlKey: true })).toBe(true);
+      expect(isVimCtrlChord({ key: "]", code: "BracketRight", ctrlKey: true })).toBe(true);
+    });
+
+    it("does not treat Ctrl+S as a generic Vim Ctrl chord (reserved for App Save)", () => {
+      expect(isVimCtrlChord({ key: "s", ctrlKey: true })).toBe(false);
+      expect(isVimCtrlChord({ key: "S", ctrlKey: true })).toBe(false);
+    });
+
+    it("rejects non-Ctrl modifiers or plain keys", () => {
+      expect(isVimCtrlChord({ key: "r", ctrlKey: false })).toBe(false);
+      expect(isVimCtrlChord({ key: "r", ctrlKey: true, altKey: true })).toBe(false);
+      expect(isVimCtrlChord({ key: "r", ctrlKey: true, metaKey: true })).toBe(false);
+    });
+  });
+
   describe("isNonPrintableOrControlKey", () => {
     it("recognizes navigation and control keys", () => {
       const makeEvent = (key: string, ctrl = false) =>
@@ -44,6 +78,9 @@ describe("Vim IME Isolation Utilities", () => {
       expect(isNonPrintableOrControlKey(makeEvent("ArrowDown"))).toBe(true);
       expect(isNonPrintableOrControlKey(makeEvent("r", true))).toBe(true); // Ctrl+R
       expect(isNonPrintableOrControlKey(makeEvent("f", true))).toBe(true); // Ctrl+F
+      expect(isNonPrintableOrControlKey(makeEvent("p", true))).toBe(true); // Ctrl+P
+      expect(isNonPrintableOrControlKey(makeEvent("d", true))).toBe(true); // Ctrl+D
+      expect(isNonPrintableOrControlKey(makeEvent("u", true))).toBe(true); // Ctrl+U
     });
 
     it("does not treat plain printable keys as non-printable or control keys", () => {
@@ -74,6 +111,67 @@ describe("Vim IME Isolation Utilities", () => {
       expect(state.composing).toBe(false);
       expect(state.suppressCommit).toBe(false);
       expect(state.pendingPrintableKey).toBeNull();
+    });
+  });
+
+  describe("attachVimImeProxy keyboard interception", () => {
+    it("unconditionally prevents default and stops propagation for Ctrl chords (Ctrl+R, Ctrl+F, Ctrl+P)", () => {
+      const container = document.createElement("div");
+      const textarea = document.createElement("textarea");
+      container.appendChild(textarea);
+      document.body.appendChild(container);
+
+      const view = new EditorView({
+        state: EditorState.create({
+          doc: "Initial line 1\nInitial line 2\nInitial line 3",
+          extensions: [vim()],
+        }),
+        parent: container,
+      });
+
+      const onSave = vi.fn();
+      const proxy = attachVimImeProxy(view, textarea, container, { onSave });
+
+      const testKeys = ["r", "f", "p", "d", "u", "b", "w"];
+      for (const k of testKeys) {
+        let prevented = false;
+        let stopped = false;
+        const event = new KeyboardEvent("keydown", {
+          key: k,
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        });
+        event.preventDefault = () => {
+          prevented = true;
+        };
+        event.stopPropagation = () => {
+          stopped = true;
+        };
+
+        textarea.dispatchEvent(event);
+        expect(prevented).toBe(true);
+        expect(stopped).toBe(true);
+      }
+
+      // Test Ctrl+S triggers onSave
+      let savePrevented = false;
+      const saveEvent = new KeyboardEvent("keydown", {
+        key: "s",
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      saveEvent.preventDefault = () => {
+        savePrevented = true;
+      };
+      textarea.dispatchEvent(saveEvent);
+      expect(savePrevented).toBe(true);
+      expect(onSave).toHaveBeenCalledTimes(1);
+
+      proxy.cleanup();
+      view.destroy();
+      container.remove();
     });
   });
 });

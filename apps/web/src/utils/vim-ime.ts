@@ -32,7 +32,62 @@ export function isAsciiPrintable(str: string): boolean {
   return code >= 0x20 && code <= 0x7e;
 }
 
-export function isNonPrintableOrControlKey(e: KeyboardEvent): boolean {
+export const VIM_CTRL_KEYS = new Set([
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "[",
+  "]",
+]);
+
+export function isVimCtrlChord(e: {
+  key: string;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+  code?: string;
+}): boolean {
+  if (!e.ctrlKey || e.altKey || e.metaKey) {
+    return false;
+  }
+  const key = e.key.toLowerCase();
+  if (VIM_CTRL_KEYS.has(key)) {
+    return true;
+  }
+  if (e.code === "BracketLeft" || e.code === "BracketRight") {
+    return true;
+  }
+  return false;
+}
+
+export function isNonPrintableOrControlKey(e: KeyboardEvent | {
+  key: string;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+  code?: string;
+}): boolean {
   // Modifiers alone: ignore
   if (
     e.key === "Shift" ||
@@ -44,8 +99,7 @@ export function isNonPrintableOrControlKey(e: KeyboardEvent): boolean {
   }
 
   // Ctrl chords (e.g. Ctrl+R, Ctrl+F, Ctrl+B, Ctrl+D, Ctrl+U, Ctrl+[, Ctrl+C, etc.)
-  // On macOS, e.ctrlKey is Vim Ctrl (while e.metaKey is Command).
-  if (e.ctrlKey && !e.altKey && !e.metaKey) {
+  if (isVimCtrlChord(e)) {
     return true;
   }
 
@@ -212,14 +266,12 @@ export function attachVimImeProxy(
       return;
     }
 
-    // Non-printable or Ctrl chords: execute immediately
+    // Non-printable or Ctrl chords: execute immediately with unconditional preventDefault / stopPropagation
     if (isNonPrintableOrControlKey(e)) {
+      e.preventDefault();
+      e.stopPropagation();
       imeState.pendingPrintableKey = null;
-      const handled = forwardKeyToVim(view, e);
-      if (handled || e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+      forwardKeyToVim(view, e);
       return;
     }
 
