@@ -4,6 +4,14 @@ import { VimMarkdownEditor } from "./VimMarkdownEditor";
 import { MarkdownPreview, type MarkdownPreviewHandle } from "./MarkdownPreview";
 import { EmptyEditor } from "./EmptyEditor";
 import { ConflictBanner } from "./ConflictBanner";
+import {
+  loadSavedSplitRatio,
+  saveSplitRatio,
+  calculateSplitRatio,
+  DEFAULT_SPLIT_RATIO,
+  MIN_SPLIT_RATIO,
+  MAX_SPLIT_RATIO,
+} from "../../utils/split-layout";
 import type { Theme } from "./VditorEditor";
 import type { EditorHandle } from "./EditorHandle";
 
@@ -52,10 +60,50 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
   ) => {
     const activeEditorRef = useRef<EditorHandle | null>(null);
     const previewRef = useRef<MarkdownPreviewHandle | null>(null);
+    const splitContainerRef = useRef<HTMLDivElement>(null);
     const [syncScrollEnabled, setSyncScrollEnabled] = useState(true);
+    const [isResizingSplit, setIsResizingSplit] = useState(false);
+    const [splitRatio, setSplitRatio] = useState<number>(loadSavedSplitRatio);
 
     const isSyncingEditorToPreview = useRef(false);
     const isSyncingPreviewToEditor = useRef(false);
+
+    const handleDividerPointerDown = useCallback(
+      (e: React.PointerEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsResizingSplit(true);
+
+        const handlePointerMove = (moveEvent: PointerEvent) => {
+          const container = splitContainerRef.current;
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const nextRatio = calculateSplitRatio(moveEvent.clientX, rect);
+          setSplitRatio(nextRatio);
+        };
+
+        const handlePointerUp = (upEvent: PointerEvent) => {
+          setIsResizingSplit(false);
+          window.removeEventListener("pointermove", handlePointerMove);
+          window.removeEventListener("pointerup", handlePointerUp);
+
+          const container = splitContainerRef.current;
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const nextRatio = calculateSplitRatio(upEvent.clientX, rect);
+          setSplitRatio(nextRatio);
+          saveSplitRatio(nextRatio);
+        };
+
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerup", handlePointerUp);
+      },
+      [],
+    );
+
+    const handleDividerDoubleClick = useCallback(() => {
+      setSplitRatio(DEFAULT_SPLIT_RATIO);
+      saveSplitRatio(DEFAULT_SPLIT_RATIO);
+    }, []);
 
     useImperativeHandle(
       ref,
@@ -115,7 +163,15 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
         <div className="editor-wrapper">
           {editorMode === "vim" ? (
             <div
-              className={`vim-split-container ${vimPreviewOpen ? "preview-open" : "preview-closed"}`}
+              ref={splitContainerRef}
+              className={`vim-split-container ${vimPreviewOpen ? "preview-open" : "preview-closed"} ${isResizingSplit ? "is-resizing-split" : ""}`}
+              style={
+                vimPreviewOpen
+                  ? ({
+                      "--vim-split-ratio": `${(splitRatio * 100).toFixed(2)}%`,
+                    } as React.CSSProperties)
+                  : undefined
+              }
             >
               <div className="vim-split-editor">
                 <VimMarkdownEditor
@@ -137,7 +193,18 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
               </div>
               {vimPreviewOpen && (
                 <>
-                  <div className="vim-split-divider" />
+                  <div
+                    className={`vim-split-divider ${isResizingSplit ? "is-resizing" : ""}`}
+                    onPointerDown={handleDividerPointerDown}
+                    onDoubleClick={handleDividerDoubleClick}
+                    title="拖拽调整编辑器与预览占比，双击恢复 50%"
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-valuenow={Math.round(splitRatio * 100)}
+                    aria-valuemin={Math.round(MIN_SPLIT_RATIO * 100)}
+                    aria-valuemax={Math.round(MAX_SPLIT_RATIO * 100)}
+                    tabIndex={0}
+                  />
                   <div className="vim-split-preview">
                     <MarkdownPreview
                       ref={previewRef}

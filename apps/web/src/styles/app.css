@@ -1161,6 +1161,20 @@ kbd {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  position: relative;
+}
+
+.vim-split-container.is-resizing-split {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
+.vim-split-container.is-resizing-split * {
+  pointer-events: none;
+}
+
+.vim-split-container.is-resizing-split .vim-split-divider {
+  pointer-events: auto;
 }
 
 .vim-split-editor {
@@ -1170,17 +1184,52 @@ kbd {
   overflow: hidden;
 }
 
+.vim-split-container.preview-open .vim-split-editor {
+  flex: none;
+  width: calc(var(--vim-split-ratio, 50%) - 4px);
+  min-width: 120px;
+  max-width: calc(100% - 120px);
+}
+
 .vim-split-divider {
-  width: 1px;
-  background-color: var(--border-color);
+  width: 8px;
+  margin: 0 -4px;
+  position: relative;
+  cursor: col-resize;
+  background-color: transparent;
   flex-shrink: 0;
   height: 100%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.vim-split-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background-color: var(--border-color);
+  transition: background-color 0.15s ease, width 0.15s ease;
+}
+
+.vim-split-divider:hover::before,
+.vim-split-divider.is-resizing::before,
+.vim-split-container.is-resizing-split .vim-split-divider::before {
+  background-color: var(--accent);
+  width: 3px;
+  left: 2.5px;
 }
 
 .vim-split-preview {
   flex: 1;
   height: 100%;
-  min-width: 0;
+  min-width: 120px;
   overflow-y: auto;
   background-color: var(--app-bg);
 }
