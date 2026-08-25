@@ -11,6 +11,7 @@ import {
   type ShortcutBinding,
   type CustomShortcuts,
 } from "../../utils/vim-keyboard";
+import { processWallpaperImage } from "../../utils/wallpaper";
 import "../../styles/settings.css";
 
 interface SettingsDialogProps {
@@ -359,15 +360,19 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     type="file"
                     accept="image/*"
                     style={{ display: "none" }}
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        const result = event.target?.result as string;
+                      try {
+                        const result = await processWallpaperImage(file);
                         if (result) onUpdateSetting("bgImage", result);
-                      };
-                      reader.readAsDataURL(file);
+                      } catch (err: unknown) {
+                        alert(
+                          `壁纸加载失败: ${err instanceof Error ? err.message : "未知错误"}`,
+                        );
+                      } finally {
+                        e.target.value = "";
+                      }
                     }}
                   />
                 </label>

@@ -1406,8 +1406,8 @@ html[data-has-bg="true"] .sidebar-container {
   -webkit-backdrop-filter: blur(16px);
 }
 
-html[data-has-bg="true"] .main-content {
-  background-color: color-mix(in srgb, var(--app-bg) 84%, transparent);
+html[data-has-bg="true"] .main-container {
+  background-color: color-mix(in srgb, var(--app-bg) 82%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -1425,15 +1425,18 @@ html[data-has-bg="true"] .tab-bar {
   -webkit-backdrop-filter: blur(14px);
 }
 
-html[data-has-bg="true"] .editor-pane {
-  background-color: transparent;
-}
-
-html[data-has-bg="true"] .vditor {
+html[data-has-bg="true"] .editor-with-outline-container,
+html[data-has-bg="true"] .editor-pane,
+html[data-has-bg="true"] .editor-pane-inner,
+html[data-has-bg="true"] .editor-wrapper,
+html[data-has-bg="true"] .editor-container {
   background-color: transparent !important;
 }
 
-html[data-has-bg="true"] .vditor-ir {
+html[data-has-bg="true"] .vditor,
+html[data-has-bg="true"] .vditor-content,
+html[data-has-bg="true"] .vditor-ir,
+html[data-has-bg="true"] .vditor-reset {
   background-color: transparent !important;
 }
 
@@ -1443,8 +1446,19 @@ html[data-has-bg="true"] .vditor-toolbar {
   -webkit-backdrop-filter: blur(12px);
 }
 
-html[data-has-bg="true"] .cm-editor {
+html[data-has-bg="true"] .vim-markdown-editor,
+html[data-has-bg="true"] .vim-split-container,
+html[data-has-bg="true"] .vim-split-editor,
+html[data-has-bg="true"] .cm-editor,
+html[data-has-bg="true"] .cm-scroller {
   background-color: transparent !important;
+}
+
+html[data-has-bg="true"] .vim-split-preview,
+html[data-has-bg="true"] .note-web-markdown-preview {
+  background-color: color-mix(in srgb, var(--app-bg) 75%, transparent) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 html[data-has-bg="true"] .cm-gutters {
@@ -1456,4 +1470,5 @@ html[data-has-bg="true"] .outline-panel {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
 
