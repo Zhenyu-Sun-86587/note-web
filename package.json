@@ -13,7 +13,8 @@
     "start": "npm run start -w apps/server",
     "test": "npm run test -w apps/server && npm run test -w apps/web",
     "test:e2e": "playwright test",
-    "typecheck": "npm run typecheck -w apps/web && npm run typecheck -w apps/server"
+    "typecheck": "npm run typecheck -w apps/web && npm run typecheck -w apps/server",
+    "deploy": "./deploy.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
