@@ -1,4 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import {
+  DEFAULT_APP_SHORTCUTS,
+  type AppAction,
+  type ShortcutBinding,
+} from "../utils/vim-keyboard";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type EditorMode = "ir" | "vim";
@@ -19,6 +24,7 @@ export interface AppSettings {
   uiFont: string;
   monoFont: string;
   sidebarWidth: number;
+  shortcuts?: Partial<Record<AppAction, ShortcutBinding>>;
 }
 
 export const SETTINGS_KEY = "note-web-settings-v1";
@@ -42,6 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   monoFont:
     '"NoteWeb Mono CJK", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", ui-monospace, monospace',
   sidebarWidth: 280,
+  shortcuts: { ...DEFAULT_APP_SHORTCUTS },
 };
 
 export function loadSettings(): AppSettings {
@@ -61,9 +68,16 @@ export function loadSettings(): AppSettings {
     if (parsed.editorMode && !["ir", "vim"].includes(parsed.editorMode)) {
       delete parsed.editorMode;
     }
+    const shortcuts = {
+      ...DEFAULT_APP_SHORTCUTS,
+      ...(parsed.shortcuts && typeof parsed.shortcuts === "object"
+        ? parsed.shortcuts
+        : {}),
+    };
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
+      shortcuts,
     };
   } catch {
     return DEFAULT_SETTINGS;

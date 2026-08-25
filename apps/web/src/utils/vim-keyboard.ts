@@ -25,42 +25,164 @@ export type AppAction =
   | "toggle-outline"
   | "toggle-vim-preview";
 
+export interface ShortcutBinding {
+  key: string;
+  ctrl?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+  meta?: boolean;
+}
+
+export type CustomShortcuts = Record<AppAction, ShortcutBinding>;
+
+export const DEFAULT_APP_SHORTCUTS: CustomShortcuts = {
+  save: { key: "s", ctrl: true, shift: true },
+  "quick-open": { key: "p", ctrl: true, shift: true },
+  "new-note": { key: "n", ctrl: true, shift: true },
+  search: { key: "f", ctrl: true, shift: true },
+  sidebar: { key: "b", ctrl: true, shift: true },
+  settings: { key: ",", ctrl: true, shift: true },
+  "toggle-outline": { key: "o", ctrl: true, alt: true },
+  "toggle-vim-preview": { key: "v", ctrl: true, alt: true },
+};
+
+export const SHORTCUT_INFO: Record<
+  AppAction,
+  { label: string; description: string; defaultDesc: string }
+> = {
+  save: {
+    label: "保存笔记",
+    description: "立即保存当前笔记修改",
+    defaultDesc: "Ctrl+Shift+S",
+  },
+  "quick-open": {
+    label: "快速打开",
+    description: "通过文件名快速查找并切换笔记",
+    defaultDesc: "Ctrl+Shift+P",
+  },
+  "new-note": {
+    label: "新建笔记",
+    description: "在当前目录或根目录新建空白笔记",
+    defaultDesc: "Ctrl+Shift+N",
+  },
+  search: {
+    label: "全局搜索",
+    description: "搜索所有笔记的文件名与全文内容",
+    defaultDesc: "Ctrl+Shift+F",
+  },
+  sidebar: {
+    label: "切换侧边栏",
+    description: "显示或隐藏文件导航侧边栏",
+    defaultDesc: "Ctrl+Shift+B",
+  },
+  settings: {
+    label: "偏好设置",
+    description: "打开系统与编辑器偏好设置",
+    defaultDesc: "Ctrl+Shift+,",
+  },
+  "toggle-outline": {
+    label: "切换大纲",
+    description: "展开或收起 Markdown 大纲面板",
+    defaultDesc: "Ctrl+Alt+O",
+  },
+  "toggle-vim-preview": {
+    label: "切换 Vim 预览",
+    description: "在 Vim 模式下开启或关闭分栏实时预览",
+    defaultDesc: "Ctrl+Alt+V",
+  },
+};
+
+/**
+ * Formats a ShortcutBinding into a human-readable display string.
+ */
+export function formatShortcutBinding(
+  binding: ShortcutBinding,
+  isMac?: boolean,
+): string {
+  const isMacPlatform =
+    isMac ??
+    (typeof navigator !== "undefined" &&
+      /Macintosh|Mac OS X/i.test(navigator.userAgent));
+
+  const parts: string[] = [];
+  if (binding.ctrl) {
+    parts.push(isMacPlatform ? "Cmd" : "Ctrl");
+  }
+  if (binding.alt) {
+    parts.push(isMacPlatform ? "Option" : "Alt");
+  }
+  if (binding.shift) {
+    parts.push("Shift");
+  }
+
+  let keyDisplay = binding.key;
+  if (keyDisplay.length === 1) {
+    keyDisplay = keyDisplay.toUpperCase();
+  } else if (keyDisplay.startsWith("arrow")) {
+    keyDisplay = keyDisplay.slice(5).toUpperCase();
+  } else {
+    keyDisplay = keyDisplay.charAt(0).toUpperCase() + keyDisplay.slice(1);
+  }
+  parts.push(keyDisplay);
+
+  return parts.join("+");
+}
+
 /**
  * Checks if a keyboard event matches a Note Web App-owned shortcut.
  */
-export function isAppOwnedShortcut(e: KeyboardEvent | {
-  key: string;
-  ctrlKey?: boolean;
-  metaKey?: boolean;
-  shiftKey?: boolean;
-  altKey?: boolean;
-  code?: string;
-}): AppAction | null {
+export function isAppOwnedShortcut(
+  e:
+    | KeyboardEvent
+    | {
+        key: string;
+        ctrlKey?: boolean;
+        metaKey?: boolean;
+        shiftKey?: boolean;
+        altKey?: boolean;
+        code?: string;
+      },
+  customShortcuts?: Partial<CustomShortcuts>,
+): AppAction | null {
   const isMac =
     typeof navigator !== "undefined" &&
     /Macintosh|Mac OS X/i.test(navigator.userAgent);
-  const mod = isMac ? (e.metaKey || e.ctrlKey) : e.ctrlKey;
+  const mod = isMac ? Boolean(e.metaKey || e.ctrlKey) : Boolean(e.ctrlKey);
 
-  if (!mod) {
-    return null;
-  }
+  const shortcuts: CustomShortcuts = {
+    ...DEFAULT_APP_SHORTCUTS,
+    ...customShortcuts,
+  } as CustomShortcuts;
 
-  const key = e.key.toLowerCase();
+  const eventKey = (e.key || "").toLowerCase();
+  const eventCode = (e as KeyboardEvent).code;
+  const isShift = Boolean(e.shiftKey);
+  const isAlt = Boolean(e.altKey);
 
-  // App shortcuts with Ctrl/Cmd + Shift (no Alt)
-  if (e.shiftKey && !e.altKey) {
-    if (key === "s") return "save";
-    if (key === "p") return "quick-open";
-    if (key === "n") return "new-note";
-    if (key === "f") return "search";
-    if (key === "b") return "sidebar";
-    if (key === "," || key === "<" || e.code === "Comma") return "settings";
-  }
+  for (const [action, binding] of Object.entries(shortcuts) as [
+    AppAction,
+    ShortcutBinding,
+  ][]) {
+    if (!binding) continue;
 
-  // Safe App shortcuts with Ctrl/Cmd + Alt (no Shift)
-  if (e.altKey && !e.shiftKey) {
-    if (key === "o") return "toggle-outline";
-    if (key === "v") return "toggle-vim-preview";
+    const reqMod = Boolean(binding.ctrl);
+    const reqShift = Boolean(binding.shift);
+    const reqAlt = Boolean(binding.alt);
+
+    if (mod !== reqMod) continue;
+    if (isShift !== reqShift) continue;
+    if (isAlt !== reqAlt) continue;
+
+    const targetKey = binding.key.toLowerCase();
+    if (
+      targetKey === "," &&
+      (eventKey === "," || eventKey === "<" || eventCode === "Comma")
+    ) {
+      return action;
+    }
+    if (eventKey === targetKey) {
+      return action;
+    }
   }
 
   return null;

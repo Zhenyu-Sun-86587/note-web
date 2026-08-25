@@ -1048,6 +1048,7 @@ export default function App() {
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
+    shortcuts: settings.shortcuts,
     onSave: () => {
       if (openNote) saveNow();
     },
@@ -1104,6 +1105,7 @@ export default function App() {
           onDeleteFolder={handleDeleteFolderAction}
           onContextMenu={handleOpenContextMenu}
           loading={treeLoading}
+          shortcuts={settings.shortcuts}
         />
       }
     >
@@ -1140,6 +1142,7 @@ export default function App() {
         onToggleOutline={toggleOutline}
         vimPreviewOpen={vimPreviewOpen}
         onToggleVimPreview={toggleVimPreview}
+        shortcuts={settings.shortcuts}
       />
 
       <TabBar
@@ -1172,6 +1175,7 @@ export default function App() {
           onSwitchToIR={() => handleSwitchEditorMode("ir")}
           onToggleZen={toggleZenMode}
           onCursorActivity={(line) => setCursorLine(line)}
+          shortcuts={settings.shortcuts}
         />
 
         <OutlinePanel
@@ -1180,6 +1184,7 @@ export default function App() {
           isOpen={outlineOpen}
           onClose={() => setOutlineOpen(false)}
           onSelectHeading={handleSelectHeading}
+          shortcuts={settings.shortcuts}
         />
       </div>
 

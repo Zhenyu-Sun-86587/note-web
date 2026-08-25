@@ -9,6 +9,12 @@ import {
 import type { TreeNode } from "../../api/types";
 import { IconButton } from "../common/IconButton";
 import { FileTree } from "./FileTree";
+import {
+  DEFAULT_APP_SHORTCUTS,
+  formatShortcutBinding,
+  type AppAction,
+  type CustomShortcuts,
+} from "../../utils/vim-keyboard";
 
 interface SidebarProps {
   items: TreeNode[];
@@ -26,6 +32,7 @@ interface SidebarProps {
   onDeleteFolder: (folderPath: string) => void;
   onContextMenu?: (e: React.MouseEvent, node?: TreeNode) => void;
   loading: boolean;
+  shortcuts?: Partial<CustomShortcuts>;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -44,7 +51,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteFolder,
   onContextMenu,
   loading,
+  shortcuts,
 }) => {
+  const getShortcutDesc = (action: AppAction) => {
+    const binding =
+      (shortcuts && shortcuts[action]) || DEFAULT_APP_SHORTCUTS[action];
+    return formatShortcutBinding(binding);
+  };
+
   return (
     <div className="sidebar">
       <div className="sidebar-header">
@@ -54,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-actions">
           <IconButton
             icon={<FilePlus size={16} />}
-            label="新建笔记 (Ctrl+Shift+N)"
+            label={`新建笔记 (${getShortcutDesc("new-note")})`}
             onClick={onNewNote}
             size="sm"
           />
@@ -66,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
           <IconButton
             icon={<Search size={16} />}
-            label="全文搜索 (Ctrl+Shift+F)"
+            label={`全文搜索 (${getShortcutDesc("search")})`}
             onClick={onOpenSearch}
             size="sm"
           />
@@ -82,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-quick-open">
         <button className="quick-open-btn" onClick={onOpenQuickOpen}>
           <Zap size={14} />
-          <span>快速打开... (Ctrl+Shift+P)</span>
+          <span>快速打开... ({getShortcutDesc("quick-open")})</span>
         </button>
       </div>
 

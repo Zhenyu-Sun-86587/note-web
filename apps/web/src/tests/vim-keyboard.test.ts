@@ -61,4 +61,47 @@ describe("Vim Keyboard Ownership", () => {
     expect(isVimOwnedCtrlChord({ key: "[", code: "BracketLeft", ctrlKey: true })).toBe(true);
     expect(isVimOwnedCtrlChord({ key: "]", code: "BracketRight", ctrlKey: true })).toBe(true);
   });
+
+  it("supports custom shortcut overrides via isAppOwnedShortcut", () => {
+    const customShortcuts = {
+      save: { key: "s", ctrl: true, alt: true }, // Remap Save to Ctrl+Alt+S
+      "quick-open": { key: "k", ctrl: true }, // Remap Quick Open to Ctrl+K
+    };
+
+    // New custom bindings trigger correctly
+    expect(
+      isAppOwnedShortcut(
+        { key: "s", ctrlKey: true, altKey: true },
+        customShortcuts,
+      ),
+    ).toBe("save");
+    expect(
+      isAppOwnedShortcut(
+        { key: "k", ctrlKey: true },
+        customShortcuts,
+      ),
+    ).toBe("quick-open");
+
+    // Old default binding for overridden action no longer triggers
+    expect(
+      isAppOwnedShortcut(
+        { key: "s", ctrlKey: true, shiftKey: true },
+        customShortcuts,
+      ),
+    ).toBeNull();
+    expect(
+      isAppOwnedShortcut(
+        { key: "p", ctrlKey: true, shiftKey: true },
+        customShortcuts,
+      ),
+    ).toBeNull();
+
+    // Non-overridden actions retain their defaults
+    expect(
+      isAppOwnedShortcut(
+        { key: "n", ctrlKey: true, shiftKey: true },
+        customShortcuts,
+      ),
+    ).toBe("new-note");
+  });
 });

@@ -1,6 +1,12 @@
 import React, { useMemo } from "react";
 import { X, AlignLeft } from "lucide-react";
 import type { HeadingItem } from "../../utils/outline-parser";
+import {
+  DEFAULT_APP_SHORTCUTS,
+  formatShortcutBinding,
+  type AppAction,
+  type CustomShortcuts,
+} from "../../utils/vim-keyboard";
 
 export interface OutlinePanelProps {
   headings: HeadingItem[];
@@ -8,6 +14,7 @@ export interface OutlinePanelProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectHeading: (heading: HeadingItem) => void;
+  shortcuts?: Partial<CustomShortcuts>;
 }
 
 export const OutlinePanel: React.FC<OutlinePanelProps> = ({
@@ -16,7 +23,14 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
   isOpen,
   onClose,
   onSelectHeading,
+  shortcuts,
 }) => {
+  const getShortcutDesc = (action: AppAction) => {
+    const binding =
+      (shortcuts && shortcuts[action]) || DEFAULT_APP_SHORTCUTS[action];
+    return formatShortcutBinding(binding);
+  };
+
   // Determine active heading based on activeLine (the last heading at or above activeLine)
   const activeHeadingId = useMemo(() => {
     if (activeLine == null || headings.length === 0) {
@@ -51,7 +65,7 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
           type="button"
           className="outline-close-btn"
           onClick={onClose}
-          title="关闭大纲 (Ctrl+Alt+O)"
+          title={`关闭大纲 (${getShortcutDesc("toggle-outline")})`}
           aria-label="关闭大纲"
         >
           <X size={14} />

@@ -14,6 +14,7 @@ import {
 } from "../../utils/split-layout";
 import type { Theme } from "./VditorEditor";
 import type { EditorHandle } from "./EditorHandle";
+import type { CustomShortcuts } from "../../utils/vim-keyboard";
 
 export interface EditorPaneProps {
   notePath: string | null;
@@ -33,6 +34,7 @@ export interface EditorPaneProps {
   onSwitchToIR?: () => void;
   onToggleZen?: () => void;
   onCursorActivity?: (line: number) => void;
+  shortcuts?: Partial<CustomShortcuts>;
 }
 
 export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
@@ -55,6 +57,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
       onSwitchToIR,
       onToggleZen,
       onCursorActivity,
+      shortcuts,
     },
     ref,
   ) => {
@@ -149,7 +152,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(
     );
 
     if (!notePath) {
-      return <EmptyEditor onNewNote={onNewNote} />;
+      return <EmptyEditor onNewNote={onNewNote} shortcuts={shortcuts} />;
     }
 
     return (

@@ -2811,6 +2811,73 @@ test.describe("Note Web E2E Suite", () => {
     });
     expect(cursorHead).toBeGreaterThanOrEqual(0);
   });
+
+  test("Feature: Custom Shortcuts configuration in Settings dialog with recording and reset", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // 1. Open Settings modal via TopBar settings button
+    const settingsBtn = page.locator("button[aria-label='设置']");
+    await settingsBtn.click();
+
+    const settingsModal = page.locator(".settings-dialog");
+    await expect(settingsModal).toBeVisible();
+
+    // 2. Check Shortcuts section exists and displays default bindings
+    const shortcutsSection = settingsModal.locator(".settings-shortcuts-list");
+    await expect(shortcutsSection).toBeVisible();
+
+    // Find the shortcut item for "快速打开"
+    const quickOpenItem = shortcutsSection.locator(".shortcut-item", {
+      hasText: "快速打开",
+    });
+    await expect(quickOpenItem).toBeVisible();
+    await expect(quickOpenItem.locator(".shortcut-kbd")).toContainText("Ctrl+Shift+P");
+
+    // 3. Click the key binding button to enter recording state
+    const quickOpenKeyBtn = quickOpenItem.locator(".shortcut-key-btn");
+    await quickOpenKeyBtn.click();
+    await expect(quickOpenKeyBtn).toContainText("请按组合键...");
+
+    // 4. Press new key combination: Control + Alt + K
+    await page.keyboard.press("Control+Alt+k");
+
+    // 5. Verify shortcut is updated
+    await expect(quickOpenKeyBtn.locator(".shortcut-kbd")).toContainText("Ctrl+Alt+K");
+    const resetBtn = quickOpenItem.locator(".shortcut-reset-btn");
+    await expect(resetBtn).toBeVisible();
+
+    // 6. Close Settings dialog
+    const closeBtn = settingsModal.locator(".modal-header button[aria-label='关闭']");
+    await closeBtn.click();
+    await expect(settingsModal).not.toBeVisible();
+
+    // 7. Verify the old default shortcut Ctrl+Shift+P does NOT open QuickOpen dialog
+    const quickOpenDialog = page.locator(".quick-open-dialog");
+    await page.keyboard.press("Control+Shift+p");
+    await expect(quickOpenDialog).not.toBeVisible();
+
+    // 8. Press the new custom shortcut Ctrl+Alt+K -> Quick Open dialog opens!
+    await page.keyboard.press("Control+Alt+k");
+    await expect(quickOpenDialog).toBeVisible({ timeout: 5000 });
+
+    // Close quick open dialog with Escape
+    await page.keyboard.press("Escape");
+    await expect(quickOpenDialog).not.toBeVisible();
+
+    // 9. Re-open Settings and reset the customized shortcut
+    await settingsBtn.click();
+    await expect(settingsModal).toBeVisible();
+    await resetBtn.click();
+    await expect(quickOpenKeyBtn.locator(".shortcut-kbd")).toContainText("Ctrl+Shift+P");
+    await expect(resetBtn).not.toBeVisible();
+
+    // 10. Close Settings and verify default Ctrl+Shift+P works again
+    await closeBtn.click();
+    await page.keyboard.press("Control+Shift+p");
+    await expect(quickOpenDialog).toBeVisible({ timeout: 5000 });
+  });
 });
 
 

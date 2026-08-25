@@ -185,4 +185,56 @@ describe("useKeyboardShortcuts hook", () => {
     modal.remove();
     vimEditor.remove();
   });
+
+  it("respects custom shortcuts passed to useKeyboardShortcuts", () => {
+    const onSave = vi.fn();
+    const onSearch = vi.fn();
+    const customShortcuts = {
+      save: { key: "s", ctrl: true, alt: true }, // Custom Ctrl+Alt+S for save
+      search: { key: "h", ctrl: true, shift: true }, // Custom Ctrl+Shift+H for search
+    };
+
+    renderHook(() =>
+      useKeyboardShortcuts({
+        onSave,
+        onSearch,
+        shortcuts: customShortcuts,
+      }),
+    );
+
+    // 1. Custom Ctrl+Alt+S triggers onSave
+    const customSaveEvent = new KeyboardEvent("keydown", {
+      key: "s",
+      ctrlKey: true,
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const savePrevented = !window.dispatchEvent(customSaveEvent);
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(savePrevented).toBe(true);
+
+    // 2. Old default Ctrl+Shift+S no longer triggers onSave
+    const defaultSaveEvent = new KeyboardEvent("keydown", {
+      key: "s",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(defaultSaveEvent);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    // 3. Custom Ctrl+Shift+H triggers onSearch
+    const customSearchEvent = new KeyboardEvent("keydown", {
+      key: "h",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const searchPrevented = !window.dispatchEvent(customSearchEvent);
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(searchPrevented).toBe(true);
+  });
 });

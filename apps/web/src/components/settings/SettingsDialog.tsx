@@ -1,8 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, RotateCcw } from "lucide-react";
 import { Button } from "../common/Button";
 import { IconButton } from "../common/IconButton";
 import type { AppSettings, ThemePreference } from "../../hooks/useSettings";
+import {
+  DEFAULT_APP_SHORTCUTS,
+  SHORTCUT_INFO,
+  formatShortcutBinding,
+  type AppAction,
+  type ShortcutBinding,
+  type CustomShortcuts,
+} from "../../utils/vim-keyboard";
 import "../../styles/settings.css";
 
 interface SettingsDialogProps {
@@ -129,6 +137,100 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         ? ""
         : settings.monoFont,
   );
+
+  const [recordingAction, setRecordingAction] = useState<AppAction | null>(null);
+  const [conflictNotice, setConflictNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!recordingAction) return;
+
+    const handleKeyCapture = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Escape cancels recording
+      if (e.key === "Escape") {
+        setRecordingAction(null);
+        setConflictNotice(null);
+        return;
+      }
+
+      // Ignore bare modifier keydown
+      if (
+        e.key === "Control" ||
+        e.key === "Shift" ||
+        e.key === "Alt" ||
+        e.key === "Meta"
+      ) {
+        return;
+      }
+
+      const hasMod = Boolean(e.ctrlKey || e.metaKey);
+      const hasAlt = Boolean(e.altKey);
+      const hasShift = Boolean(e.shiftKey);
+
+      let key = e.key.toLowerCase();
+      if (e.code === "Comma" || e.key === "<") {
+        key = ",";
+      }
+
+      const isFunctionKey = /^f\d+$/i.test(key);
+      if (!hasMod && !hasAlt && !hasShift && !isFunctionKey) {
+        setConflictNotice(
+          "快捷键必须包含 Ctrl/Cmd、Alt、Shift 或为功能键（F1-F12）",
+        );
+        return;
+      }
+
+      const newBinding: ShortcutBinding = {
+        key,
+        ctrl: hasMod,
+        alt: hasAlt,
+        shift: hasShift,
+      };
+
+      const currentShortcuts: CustomShortcuts = {
+        ...DEFAULT_APP_SHORTCUTS,
+        ...settings.shortcuts,
+      } as CustomShortcuts;
+
+      let conflictActionName: string | null = null;
+      for (const [otherAction, otherBinding] of Object.entries(
+        currentShortcuts,
+      ) as [AppAction, ShortcutBinding][]) {
+        if (otherAction === recordingAction) continue;
+        if (
+          otherBinding.key.toLowerCase() === key &&
+          Boolean(otherBinding.ctrl) === hasMod &&
+          Boolean(otherBinding.alt) === hasAlt &&
+          Boolean(otherBinding.shift) === hasShift
+        ) {
+          conflictActionName =
+            SHORTCUT_INFO[otherAction]?.label || otherAction;
+          break;
+        }
+      }
+
+      const nextShortcuts = {
+        ...currentShortcuts,
+        [recordingAction]: newBinding,
+      };
+
+      onUpdateSetting("shortcuts", nextShortcuts);
+      setRecordingAction(null);
+      if (conflictActionName) {
+        setConflictNotice(`提示：已与「${conflictActionName}」使用相同按键`);
+        setTimeout(() => setConflictNotice(null), 3000);
+      } else {
+        setConflictNotice(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyCapture, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyCapture, true);
+    };
+  }, [recordingAction, settings.shortcuts, onUpdateSetting]);
 
   if (!isOpen) return null;
 
@@ -511,6 +613,98 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             >
               提示：特定字体（如 Maple Mono CN NF）需在本机操作系统中安装后方可直接渲染。
             </div>
+          </div>
+
+          {/* Shortcuts Section */}
+          <div className="settings-section">
+            <div className="settings-section-header">
+              <div className="settings-section-title">快捷键 (Shortcuts)</div>
+              <button
+                type="button"
+                className="settings-link-btn"
+                onClick={() =>
+                  onUpdateSetting("shortcuts", { ...DEFAULT_APP_SHORTCUTS })
+                }
+                title="将所有快捷键重置为默认值"
+              >
+                重置全部
+              </button>
+            </div>
+            <div className="settings-shortcuts-list">
+              {(Object.keys(SHORTCUT_INFO) as AppAction[]).map((action) => {
+                const info = SHORTCUT_INFO[action];
+                const binding =
+                  (settings.shortcuts && settings.shortcuts[action]) ||
+                  DEFAULT_APP_SHORTCUTS[action];
+                const defaultBinding = DEFAULT_APP_SHORTCUTS[action];
+                const isCustomized =
+                  binding.key !== defaultBinding.key ||
+                  Boolean(binding.ctrl) !== Boolean(defaultBinding.ctrl) ||
+                  Boolean(binding.alt) !== Boolean(defaultBinding.alt) ||
+                  Boolean(binding.shift) !== Boolean(defaultBinding.shift);
+                const isRecording = recordingAction === action;
+
+                return (
+                  <div
+                    key={action}
+                    className={`shortcut-item ${isRecording ? "recording" : ""}`}
+                  >
+                    <div className="shortcut-info">
+                      <span className="shortcut-label">{info.label}</span>
+                      <span className="shortcut-desc">{info.description}</span>
+                    </div>
+                    <div className="shortcut-actions">
+                      <button
+                        type="button"
+                        className={`shortcut-key-btn ${isRecording ? "recording" : ""} ${isCustomized ? "customized" : ""}`}
+                        onClick={() => {
+                          if (isRecording) {
+                            setRecordingAction(null);
+                          } else {
+                            setRecordingAction(action);
+                          }
+                        }}
+                        title={
+                          isRecording
+                            ? "按下组合键进行设置，或按 Esc 取消"
+                            : "点击以录制新快捷键"
+                        }
+                      >
+                        {isRecording ? (
+                          <span className="shortcut-recording-text">
+                            请按组合键...
+                          </span>
+                        ) : (
+                          <kbd className="shortcut-kbd">
+                            {formatShortcutBinding(binding)}
+                          </kbd>
+                        )}
+                      </button>
+                      {isCustomized && (
+                        <button
+                          type="button"
+                          className="shortcut-reset-btn"
+                          onClick={() => {
+                            onUpdateSetting("shortcuts", {
+                              ...settings.shortcuts,
+                              [action]: { ...defaultBinding },
+                            });
+                          }}
+                          title="恢复此快捷键为默认值"
+                        >
+                          <RotateCcw size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {conflictNotice && (
+              <div className="shortcut-conflict-notice">
+                {conflictNotice}
+              </div>
+            )}
           </div>
         </div>
 

@@ -14,6 +14,13 @@ import {
 import { IconButton } from "../common/IconButton";
 import { Button } from "../common/Button";
 
+import {
+  DEFAULT_APP_SHORTCUTS,
+  formatShortcutBinding,
+  type AppAction,
+  type CustomShortcuts,
+} from "../../utils/vim-keyboard";
+
 interface TopBarProps {
   currentPath: string | null;
   sidebarOpen: boolean;
@@ -31,6 +38,7 @@ interface TopBarProps {
   onToggleOutline?: () => void;
   vimPreviewOpen?: boolean;
   onToggleVimPreview?: () => void;
+  shortcuts?: Partial<CustomShortcuts>;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -50,15 +58,26 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleOutline,
   vimPreviewOpen = false,
   onToggleVimPreview,
+  shortcuts,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const getShortcutDesc = (action: AppAction) => {
+    const binding =
+      (shortcuts && shortcuts[action]) || DEFAULT_APP_SHORTCUTS[action];
+    return formatShortcutBinding(binding);
+  };
 
   return (
     <header className="topbar">
       <div className="topbar-left">
         <IconButton
           icon={<PanelLeft size={18} />}
-          label={sidebarOpen ? "隐藏侧边栏 (Ctrl+Shift+B)" : "显示侧边栏 (Ctrl+Shift+B)"}
+          label={
+            sidebarOpen
+              ? `隐藏侧边栏 (${getShortcutDesc("sidebar")})`
+              : `显示侧边栏 (${getShortcutDesc("sidebar")})`
+          }
           onClick={onToggleSidebar}
           size="sm"
         />
@@ -99,7 +118,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               onClick={onSave}
               disabled={!canSave}
               className="save-button"
-              title="保存 (Ctrl+Shift+S)"
+              title={`保存 (${getShortcutDesc("save")})`}
             >
               <Save size={14} style={{ marginRight: 4 }} />
               保存
@@ -162,8 +181,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             icon={<Columns size={18} />}
             label={
               vimPreviewOpen
-                ? "关闭实时预览 (Ctrl+Alt+V)"
-                : "开启实时预览 (Ctrl+Alt+V)"
+                ? `关闭实时预览 (${getShortcutDesc("toggle-vim-preview")})`
+                : `开启实时预览 (${getShortcutDesc("toggle-vim-preview")})`
             }
             onClick={onToggleVimPreview}
             className={vimPreviewOpen ? "active" : ""}
@@ -176,8 +195,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             icon={<AlignLeft size={18} />}
             label={
               outlineOpen
-                ? "隐藏文档大纲 (Ctrl+Alt+O)"
-                : "显示文档大纲 (Ctrl+Alt+O)"
+                ? `隐藏文档大纲 (${getShortcutDesc("toggle-outline")})`
+                : `显示文档大纲 (${getShortcutDesc("toggle-outline")})`
             }
             onClick={onToggleOutline}
             className={outlineOpen ? "active" : ""}

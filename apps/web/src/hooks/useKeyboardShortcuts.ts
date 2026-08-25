@@ -1,5 +1,9 @@
 import { useEffect } from "react";
-import { isAppOwnedShortcut } from "../utils/vim-keyboard";
+import {
+  isAppOwnedShortcut,
+  type AppAction,
+  type ShortcutBinding,
+} from "../utils/vim-keyboard";
 
 interface ShortcutsOptions {
   onSave?: () => void;
@@ -11,6 +15,7 @@ interface ShortcutsOptions {
   onEscape?: () => void;
   onToggleOutline?: () => void;
   onToggleVimPreview?: () => void;
+  shortcuts?: Partial<Record<AppAction, ShortcutBinding>>;
 }
 
 export function useKeyboardShortcuts(options: ShortcutsOptions) {
@@ -31,7 +36,7 @@ export function useKeyboardShortcuts(options: ShortcutsOptions) {
       }
 
       // 2. Note Web-owned Application Shortcuts
-      const appAction = isAppOwnedShortcut(e);
+      const appAction = isAppOwnedShortcut(e, options.shortcuts);
       if (appAction) {
         e.preventDefault();
         e.stopPropagation();

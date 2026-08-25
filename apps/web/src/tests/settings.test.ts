@@ -160,4 +160,47 @@ describe("useSettings and settings management", () => {
     expect(saved.vimLineWrapping).toBe(false);
     expect(saved.vimJjEscape).toBe(true);
   });
+
+  it("persists and updates custom shortcuts settings and resets to default", () => {
+    const { result } = renderHook(() => useSettings());
+
+    expect(result.current.settings.shortcuts).toBeDefined();
+    expect(result.current.settings.shortcuts?.save).toEqual({
+      key: "s",
+      ctrl: true,
+      shift: true,
+    });
+
+    act(() => {
+      result.current.updateSetting("shortcuts", {
+        ...result.current.settings.shortcuts,
+        save: { key: "s", ctrl: true, alt: true },
+      });
+    });
+
+    expect(result.current.settings.shortcuts?.save).toEqual({
+      key: "s",
+      ctrl: true,
+      alt: true,
+    });
+
+    const savedRaw = localStorage.getItem(SETTINGS_KEY);
+    expect(savedRaw).not.toBeNull();
+    const saved = JSON.parse(savedRaw!);
+    expect(saved.shortcuts?.save).toEqual({
+      key: "s",
+      ctrl: true,
+      alt: true,
+    });
+
+    // Resetting settings restores default shortcuts
+    act(() => {
+      result.current.resetSettings();
+    });
+    expect(result.current.settings.shortcuts?.save).toEqual({
+      key: "s",
+      ctrl: true,
+      shift: true,
+    });
+  });
 });

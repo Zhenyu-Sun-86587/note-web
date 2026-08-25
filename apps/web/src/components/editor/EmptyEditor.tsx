@@ -1,12 +1,28 @@
 import React from "react";
 import { FileText, FilePlus } from "lucide-react";
 import { Button } from "../common/Button";
+import {
+  DEFAULT_APP_SHORTCUTS,
+  formatShortcutBinding,
+  type AppAction,
+  type CustomShortcuts,
+} from "../../utils/vim-keyboard";
 
 interface EmptyEditorProps {
   onNewNote: () => void;
+  shortcuts?: Partial<CustomShortcuts>;
 }
 
-export const EmptyEditor: React.FC<EmptyEditorProps> = ({ onNewNote }) => {
+export const EmptyEditor: React.FC<EmptyEditorProps> = ({
+  onNewNote,
+  shortcuts,
+}) => {
+  const getShortcutDesc = (action: AppAction) => {
+    const binding =
+      (shortcuts && shortcuts[action]) || DEFAULT_APP_SHORTCUTS[action];
+    return formatShortcutBinding(binding);
+  };
+
   return (
     <div className="empty-editor">
       <div className="empty-editor-card">
@@ -18,24 +34,24 @@ export const EmptyEditor: React.FC<EmptyEditorProps> = ({ onNewNote }) => {
         <div className="empty-editor-actions">
           <Button variant="primary" onClick={onNewNote}>
             <FilePlus size={16} style={{ marginRight: 6 }} />
-            新建笔记 (Ctrl+Shift+N)
+            新建笔记 ({getShortcutDesc("new-note")})
           </Button>
         </div>
         <div className="empty-editor-shortcuts">
           <div className="shortcut-item">
-            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> 快速打开
+            <kbd>{getShortcutDesc("quick-open")}</kbd> 快速打开
           </div>
           <div className="shortcut-item">
-            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd> 全文搜索
+            <kbd>{getShortcutDesc("search")}</kbd> 全文搜索
           </div>
           <div className="shortcut-item">
-            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> 保存笔记
+            <kbd>{getShortcutDesc("save")}</kbd> 保存笔记
           </div>
           <div className="shortcut-item">
-            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd> 切换侧边栏
+            <kbd>{getShortcutDesc("sidebar")}</kbd> 切换侧边栏
           </div>
           <div className="shortcut-item">
-            <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>,</kbd> 设置
+            <kbd>{getShortcutDesc("settings")}</kbd> 设置
           </div>
         </div>
       </div>
