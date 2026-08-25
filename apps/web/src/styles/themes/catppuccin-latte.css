@@ -4,19 +4,19 @@ html[data-theme="catppuccin-latte"] {
   --panel-border: #ccd0da;
   --editor-bg: #eff1f5;
   --text-primary: #4c4f69;
-  --text-muted: #9ca0b0;
+  --text-muted: #7c7f93;
   --border-color: #ccd0da;
   --hover-bg: #dce0e8;
   --active-bg: #bcc0cc;
   --selected-bg: #dce0e8;
-  --selected-text: #8839ef;
+  --selected-text: #7224db;
   --accent: #8839ef;
   --accent-hover: #ea76cb;
   --danger: #d20f39;
   --danger-bg: #f9d8de;
   --warning-bg: #fae8d8;
-  --warning-border: #fe640b;
-  --warning-text: #fe640b;
+  --warning-border: #df8e1d;
+  --warning-text: #df8e1d;
   --modal-overlay: rgba(0, 0, 0, 0.4);
   --code-bg: #e6e9ef;
   --code-text: #4c4f69;
@@ -26,9 +26,9 @@ html[data-theme="catppuccin-latte"] {
   --syntax-keyword: #8839ef;
   --syntax-string: #40a02b;
   --syntax-number: #fe640b;
-  --syntax-comment: #9ca0b0;
+  --syntax-comment: #7c7f93;
   --syntax-variable: #1e66f5;
-  --syntax-function: #1e66f5;
+  --syntax-function: #04a5e5;
   --syntax-operator: #179299;
   --syntax-tag: #d20f39;
 }
