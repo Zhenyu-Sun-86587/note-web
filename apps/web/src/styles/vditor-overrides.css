@@ -1,4 +1,4 @@
-/* Vditor custom overrides for Typora-style clean look and dark theme integration */
+/* Vditor custom overrides for Typora-style clean look and multi-theme integration */
 
 .editor-container {
   height: 100%;
@@ -13,6 +13,8 @@
   flex-direction: column !important;
   border: none !important;
   background-color: var(--editor-bg) !important;
+  --toolbar-background-color: var(--panel-bg);
+  --panel-background-color: var(--editor-bg);
 }
 
 .vditor-toolbar {
@@ -28,6 +30,23 @@
 
 .vditor-toolbar__item:hover {
   color: var(--text-primary) !important;
+  background-color: var(--hover-bg) !important;
+}
+
+.vditor-toolbar__divider {
+  background-color: var(--border-color) !important;
+}
+
+.vditor-menu {
+  background-color: var(--panel-bg) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.vditor-menu__item {
+  color: var(--text-primary) !important;
+}
+
+.vditor-menu__item:hover {
   background-color: var(--hover-bg) !important;
 }
 
@@ -63,9 +82,88 @@
   overflow-y: visible !important;
 }
 
-.vditor-reset pre,
-.vditor-reset code {
+/* Code Blocks & Inline Code synchronized with active theme */
+.vditor-reset pre {
+  background-color: var(--code-bg, var(--panel-bg)) !important;
+  background-image: none !important;
+  border: 1px solid var(--code-border, var(--border-color)) !important;
+  border-radius: 6px !important;
   font-family: var(--font-mono) !important;
+}
+
+.vditor-reset pre > code {
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--code-text, var(--text-primary)) !important;
+  font-family: var(--font-mono) !important;
+}
+
+.vditor-reset code:not(.hljs):not(.highlight-chroma) {
+  background-color: var(--code-inline-bg, var(--hover-bg)) !important;
+  background-image: none !important;
+  color: var(--code-inline-text, var(--accent)) !important;
+  border-radius: 4px !important;
+  font-family: var(--font-mono) !important;
+  padding: 0.2em 0.4em !important;
+}
+
+.vditor-reset .hljs {
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--code-text, var(--text-primary)) !important;
+}
+
+/* Highlight.js syntax tokens mapped to theme variables */
+.vditor-reset .hljs-keyword,
+.vditor-reset .hljs-selector-tag,
+.vditor-reset .hljs-subst {
+  color: var(--syntax-keyword, var(--accent)) !important;
+}
+
+.vditor-reset .hljs-string,
+.vditor-reset .hljs-title,
+.vditor-reset .hljs-section,
+.vditor-reset .hljs-attribute,
+.vditor-reset .hljs-literal,
+.vditor-reset .hljs-template-tag,
+.vditor-reset .hljs-template-variable,
+.vditor-reset .hljs-type,
+.vditor-reset .hljs-addition {
+  color: var(--syntax-string, #a6e3a1) !important;
+}
+
+.vditor-reset .hljs-number,
+.vditor-reset .hljs-symbol,
+.vditor-reset .hljs-bullet {
+  color: var(--syntax-number, #fab387) !important;
+}
+
+.vditor-reset .hljs-comment,
+.vditor-reset .hljs-quote,
+.vditor-reset .hljs-deletion,
+.vditor-reset .hljs-meta {
+  color: var(--syntax-comment, var(--text-muted)) !important;
+  font-style: italic;
+}
+
+.vditor-reset .hljs-variable,
+.vditor-reset .hljs-attr {
+  color: var(--syntax-variable, var(--text-primary)) !important;
+}
+
+.vditor-reset .hljs-function,
+.vditor-reset .hljs-title.function_ {
+  color: var(--syntax-function, var(--accent)) !important;
+}
+
+.vditor-reset .hljs-operator,
+.vditor-reset .hljs-punctuation {
+  color: var(--syntax-operator, var(--text-muted)) !important;
+}
+
+.vditor-reset .hljs-tag,
+.vditor-reset .hljs-name {
+  color: var(--syntax-tag, var(--danger)) !important;
 }
 
 .vditor-reset a {
@@ -83,8 +181,18 @@
   border: 1px solid var(--border-color) !important;
 }
 
+.vditor-reset table th {
+  background-color: var(--panel-bg) !important;
+}
+
 .vditor-reset hr {
   background-color: var(--border-color) !important;
+}
+
+.vditor-reset img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: var(--radius);
 }
 
 /* Typora-like subtle inline emphasis markers */
@@ -106,31 +214,4 @@
   overflow: visible !important;
   font-size: 0.85em !important;
   opacity: 0.45 !important;
-}
-
-/* Dark mode specific tweaks */
-html[data-theme="dark"] .vditor {
-  --toolbar-background-color: var(--panel-bg);
-  --panel-background-color: var(--editor-bg);
-}
-
-html[data-theme="dark"] .vditor-toolbar {
-  background-color: var(--panel-bg) !important;
-}
-
-html[data-theme="dark"] .vditor-toolbar__divider {
-  background-color: var(--border-color) !important;
-}
-
-html[data-theme="dark"] .vditor-menu {
-  background-color: var(--panel-bg) !important;
-  border: 1px solid var(--border-color) !important;
-}
-
-html[data-theme="dark"] .vditor-menu__item {
-  color: var(--text-primary) !important;
-}
-
-html[data-theme="dark"] .vditor-menu__item:hover {
-  background-color: var(--hover-bg) !important;
 }

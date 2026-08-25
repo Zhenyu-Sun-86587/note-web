@@ -274,4 +274,35 @@ describe("useSettings and settings management", () => {
     const styleEl = document.getElementById("note-web-runtime-settings");
     expect(styleEl?.textContent).toContain("--app-bg-image: none");
   });
+
+  it("verifies code block and syntax variables exist in theme files", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const themesDir = path.resolve(__dirname, "../styles/themes");
+    const files = fs.readdirSync(themesDir).filter((f) => f.endsWith(".css"));
+
+    expect(files.length).toBeGreaterThanOrEqual(14);
+    const requiredVars = [
+      "--code-bg",
+      "--code-text",
+      "--code-border",
+      "--code-inline-bg",
+      "--code-inline-text",
+      "--syntax-keyword",
+      "--syntax-string",
+      "--syntax-number",
+      "--syntax-comment",
+      "--syntax-variable",
+      "--syntax-function",
+      "--syntax-operator",
+    ];
+
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(themesDir, file), "utf-8");
+      for (const v of requiredVars) {
+        expect(content, `${file} is missing ${v}`).toContain(v);
+      }
+    }
+  });
 });
+

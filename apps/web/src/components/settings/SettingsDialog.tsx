@@ -362,10 +362,6 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      if (file.size > 8 * 1024 * 1024) {
-                        alert("图片大小不能超过 8MB");
-                        return;
-                      }
                       const reader = new FileReader();
                       reader.onload = (event) => {
                         const result = event.target?.result as string;

@@ -20,13 +20,14 @@ import {
 } from "@codemirror/view";
 import { EditorState, Transaction, Compartment, Prec } from "@codemirror/state";
 import {
-  defaultHighlightStyle,
+  HighlightStyle,
   syntaxHighlighting,
   bracketMatching,
   foldGutter,
   foldKeymap,
   indentOnInput,
 } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
 import {
   history,
   defaultKeymap,
@@ -586,7 +587,78 @@ export const VimMarkdownEditor = forwardRef<
           color: "var(--text-muted)",
           borderRight: "1px solid var(--border-color)",
         },
+        ".cm-activeLine": {
+          backgroundColor: "var(--hover-bg)",
+        },
+        ".cm-activeLineGutter": {
+          backgroundColor: "var(--hover-bg)",
+          color: "var(--text-primary)",
+        },
       });
+
+      const themeHighlightStyle = HighlightStyle.define([
+        { tag: t.keyword, color: "var(--syntax-keyword)" },
+        {
+          tag: [t.name, t.deleted, t.character, t.propertyName, t.macroName],
+          color: "var(--syntax-variable)",
+        },
+        {
+          tag: [t.function(t.variableName), t.labelName],
+          color: "var(--syntax-function)",
+        },
+        {
+          tag: [t.color, t.constant(t.name), t.standard(t.name)],
+          color: "var(--syntax-variable)",
+        },
+        {
+          tag: [t.definition(t.name), t.separator],
+          color: "var(--syntax-variable)",
+        },
+        {
+          tag: [
+            t.typeName,
+            t.className,
+            t.number,
+            t.changed,
+            t.annotation,
+            t.modifier,
+            t.self,
+            t.namespace,
+          ],
+          color: "var(--syntax-number)",
+        },
+        {
+          tag: [
+            t.operator,
+            t.operatorKeyword,
+            t.url,
+            t.escape,
+            t.regexp,
+            t.link,
+            t.special(t.string),
+          ],
+          color: "var(--syntax-operator)",
+        },
+        {
+          tag: [t.meta, t.comment],
+          color: "var(--syntax-comment)",
+          fontStyle: "italic",
+        },
+        { tag: t.strong, fontWeight: "bold" },
+        { tag: t.emphasis, fontStyle: "italic" },
+        { tag: t.strikethrough, textDecoration: "line-through" },
+        { tag: t.link, color: "var(--accent)", textDecoration: "underline" },
+        { tag: t.heading, fontWeight: "bold", color: "var(--accent)" },
+        {
+          tag: [t.atom, t.bool, t.special(t.variableName)],
+          color: "var(--syntax-keyword)",
+        },
+        {
+          tag: [t.processingInstruction, t.string, t.inserted],
+          color: "var(--syntax-string)",
+        },
+        { tag: t.invalid, color: "var(--danger)" },
+      ]);
 
       const baseExtensions = [
         highlightActiveLineGutter(),
@@ -597,7 +669,7 @@ export const VimMarkdownEditor = forwardRef<
         dropCursor(),
         EditorState.allowMultipleSelections.of(true),
         indentOnInput(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        syntaxHighlighting(themeHighlightStyle, { fallback: true }),
         bracketMatching(),
         closeBrackets(),
         autocompletion(),

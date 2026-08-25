@@ -18,4 +18,17 @@ html[data-theme="light"] {
   --warning-border: #ffe066;
   --warning-text: #f08c00;
   --modal-overlay: rgba(0, 0, 0, 0.4);
+  --code-bg: #f6f8fa;
+  --code-text: #24292f;
+  --code-border: #d0d7de;
+  --code-inline-bg: rgba(175, 184, 193, 0.2);
+  --code-inline-text: #cf222e;
+  --syntax-keyword: #0550ae;
+  --syntax-string: #0a3069;
+  --syntax-number: #0550ae;
+  --syntax-comment: #6e7781;
+  --syntax-variable: #953800;
+  --syntax-function: #8250df;
+  --syntax-operator: #24292f;
+  --syntax-tag: #116329;
 }

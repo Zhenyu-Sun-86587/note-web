@@ -18,4 +18,17 @@ html[data-theme="tokyo-night"] {
   --warning-border: #e0af68;
   --warning-text: #e0af68;
   --modal-overlay: rgba(0, 0, 0, 0.65);
+  --code-bg: #1f2335;
+  --code-text: #c0caf5;
+  --code-border: #292e42;
+  --code-inline-bg: #24283b;
+  --code-inline-text: #bb9af7;
+  --syntax-keyword: #bb9af7;
+  --syntax-string: #9ece6a;
+  --syntax-number: #ff9e64;
+  --syntax-comment: #565f89;
+  --syntax-variable: #7aa2f7;
+  --syntax-function: #7aa2f7;
+  --syntax-operator: #89ddff;
+  --syntax-tag: #f7768e;
 }

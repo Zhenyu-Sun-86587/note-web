@@ -1300,6 +1300,74 @@ kbd {
   padding: 24px 0;
 }
 
+/* Markdown Preview Elements (Code blocks, images, tables, quotes) */
+.markdown-preview-content pre {
+  background-color: var(--code-bg, var(--panel-bg));
+  border: 1px solid var(--code-border, var(--border-color));
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin: 16px 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: var(--code-text, var(--text-primary));
+}
+
+.markdown-preview-content pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.markdown-preview-content code {
+  font-family: var(--font-mono);
+  background-color: var(--code-inline-bg, var(--hover-bg));
+  color: var(--code-inline-text, var(--accent));
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+.markdown-preview-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  margin: 12px 0;
+  display: block;
+}
+
+.markdown-preview-content blockquote {
+  margin: 16px 0;
+  padding: 0 16px;
+  color: var(--text-muted);
+  border-left: 4px solid var(--accent);
+}
+
+.markdown-preview-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+
+.markdown-preview-content th,
+.markdown-preview-content td {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+}
+
+.markdown-preview-content th {
+  background-color: var(--panel-bg);
+}
+
+.markdown-preview-content a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* Zen Mode Adjustments */
 .app-shell.zen-mode .tab-bar {
   display: none !important;

@@ -49,7 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     10,
   );
   const maxUploadBytes = Number.parseInt(
-    env.MAX_UPLOAD_BYTES || "20971520",
+    env.MAX_UPLOAD_BYTES || "524288000",
     10,
   );
 
