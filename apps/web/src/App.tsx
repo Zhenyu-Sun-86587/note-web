@@ -102,8 +102,12 @@ function getAncestorFolders(notePath: string): string[] {
 }
 
 export default function App() {
-  const { settings, effectiveTheme, updateSetting, resetSettings } =
-    useSettings();
+  const {
+    settings,
+    effectiveColorScheme,
+    updateSetting,
+    resetSettings,
+  } = useSettings();
 
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
@@ -1069,110 +1073,114 @@ export default function App() {
     isDirty && saveStatus === "idle" ? "dirty" : saveStatus;
 
   return (
-    <AppShell
-      sidebarOpen={sidebarOpen}
-      sidebarWidth={settings.sidebarWidth}
-      onResizeSidebar={(newWidth) => updateSetting("sidebarWidth", newWidth)}
-      zenMode={zenMode}
-      sidebar={
-        <Sidebar
-          items={tree}
-          selectedPath={openNote?.path ?? null}
-          expandedFolders={expandedFolders}
-          onToggleFolder={toggleFolder}
-          onSelectNote={switchNote}
-          onNewNote={() => {
-            setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
-            setNewNoteOpen(true);
+    <>
+      {settings.bgImage && (
+        <div className="app-background-layer" aria-hidden="true" />
+      )}
+      <AppShell
+        sidebarOpen={sidebarOpen}
+        sidebarWidth={settings.sidebarWidth}
+        onResizeSidebar={(newWidth) => updateSetting("sidebarWidth", newWidth)}
+        zenMode={zenMode}
+        sidebar={
+          <Sidebar
+            items={tree}
+            selectedPath={openNote?.path ?? null}
+            expandedFolders={expandedFolders}
+            onToggleFolder={toggleFolder}
+            onSelectNote={switchNote}
+            onNewNote={() => {
+              setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
+              setNewNoteOpen(true);
+            }}
+            onNewFolder={() => {
+              setNewFolderDefaultParent(
+                openNote ? getDirname(openNote.path) : "",
+              );
+              setNewFolderOpen(true);
+            }}
+            onOpenSearch={() => setSearchOpen(true)}
+            onOpenQuickOpen={() => setQuickOpenOpen(true)}
+            onRefreshTree={loadTree}
+            onNewNoteInFolder={(folder) => {
+              setNewNoteDefaultFolder(folder);
+              setNewNoteOpen(true);
+            }}
+            onNewSubFolder={(folder) => {
+              setNewFolderDefaultParent(folder);
+              setNewFolderOpen(true);
+            }}
+            onDeleteFolder={handleDeleteFolderAction}
+            onContextMenu={handleOpenContextMenu}
+            loading={treeLoading}
+            shortcuts={settings.shortcuts}
+          />
+        }
+      >
+        {zenMode && showZenHint && (
+          <div className="zen-mode-hint">
+            {editorMode === "vim" ? ":zen 退出专注模式" : "Esc 退出专注模式"}
+          </div>
+        )}
+
+        <TopBar
+          currentPath={openNote?.path ?? null}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleZenMode={toggleZenMode}
+          editorMode={editorMode}
+          onToggleEditorMode={handleSwitchEditorMode}
+          onSave={saveNow}
+          canSave={Boolean(openNote) && saveStatus !== "conflict"}
+          onRename={() => {
+            if (openNote) {
+              setRenameTarget({ type: "note", path: openNote.path });
+              setRenameOpen(true);
+            }
           }}
-          onNewFolder={() => {
-            setNewFolderDefaultParent(
-              openNote ? getDirname(openNote.path) : "",
-            );
-            setNewFolderOpen(true);
+          onMove={() => {
+            if (openNote) {
+              setMoveTarget(openNote.path);
+              setMoveOpen(true);
+            }
           }}
-          onOpenSearch={() => setSearchOpen(true)}
-          onOpenQuickOpen={() => setQuickOpenOpen(true)}
-          onRefreshTree={loadTree}
-          onNewNoteInFolder={(folder) => {
-            setNewNoteDefaultFolder(folder);
-            setNewNoteOpen(true);
-          }}
-          onNewSubFolder={(folder) => {
-            setNewFolderDefaultParent(folder);
-            setNewFolderOpen(true);
-          }}
-          onDeleteFolder={handleDeleteFolderAction}
-          onContextMenu={handleOpenContextMenu}
-          loading={treeLoading}
+          onDelete={handleDeleteCurrentNote}
+          outlineOpen={outlineOpen}
+          onToggleOutline={toggleOutline}
+          vimPreviewOpen={vimPreviewOpen}
+          onToggleVimPreview={toggleVimPreview}
           shortcuts={settings.shortcuts}
         />
-      }
-    >
-      {zenMode && showZenHint && (
-        <div className="zen-mode-hint">
-          {editorMode === "vim" ? ":zen 退出专注模式" : "Esc 退出专注模式"}
-        </div>
-      )}
 
-      <TopBar
-        currentPath={openNote?.path ?? null}
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onToggleZenMode={toggleZenMode}
-        editorMode={editorMode}
-        onToggleEditorMode={handleSwitchEditorMode}
-        onSave={saveNow}
-        canSave={Boolean(openNote) && saveStatus !== "conflict"}
-        onRename={() => {
-          if (openNote) {
-            setRenameTarget({ type: "note", path: openNote.path });
-            setRenameOpen(true);
-          }
-        }}
-        onMove={() => {
-          if (openNote) {
-            setMoveTarget(openNote.path);
-            setMoveOpen(true);
-          }
-        }}
-        onDelete={handleDeleteCurrentNote}
-        outlineOpen={outlineOpen}
-        onToggleOutline={toggleOutline}
-        vimPreviewOpen={vimPreviewOpen}
-        onToggleVimPreview={toggleVimPreview}
-        shortcuts={settings.shortcuts}
-      />
+        <TabBar
+          tabs={tabs}
+          activePath={openNote?.path ?? null}
+          onSelectTab={switchNote}
+          onCloseTab={handleCloseTab}
+        />
 
-      <TabBar
-        tabs={tabs}
-        activePath={openNote?.path ?? null}
-        onSelectTab={switchNote}
-        onCloseTab={handleCloseTab}
-      />
-
-      <div className="editor-with-outline-container">
-        <EditorPane
-          ref={editorPaneRef}
-          notePath={openNote?.path ?? null}
-          initialContent={draftContent}
-          hasConflict={saveStatus === "conflict"}
-          theme={effectiveTheme}
-          editorMode={editorMode}
-          vimRelativeLineNumbers={settings.vimRelativeLineNumbers}
-          vimLineWrapping={settings.vimLineWrapping}
-          vimJjEscape={settings.vimJjEscape}
-          vimPreviewOpen={vimPreviewOpen}
-          onChange={handleDraftChange}
-          onNewNote={() => {
-            setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
-            setNewNoteOpen(true);
-          }}
-          onReloadConflict={handleReloadConflict}
-          onSaveAsConflictCopy={handleSaveAsConflictCopy}
-          onSave={saveNow}
-          onSwitchToIR={() => handleSwitchEditorMode("ir")}
+        <div className="editor-with-outline-container">
+          <EditorPane
+            ref={editorPaneRef}
+            notePath={openNote?.path ?? null}
+            initialContent={draftContent}
+            hasConflict={saveStatus === "conflict"}
+            theme={effectiveColorScheme}
+            editorMode={editorMode}
+            vimRelativeLineNumbers={settings.vimRelativeLineNumbers}
+            vimLineWrapping={settings.vimLineWrapping}
+            vimJjEscape={settings.vimJjEscape}
+            vimPreviewOpen={vimPreviewOpen}
+            onChange={handleDraftChange}
+            onNewNote={() => {
+              setNewNoteDefaultFolder(openNote ? getDirname(openNote.path) : "");
+              setNewNoteOpen(true);
+            }}
+            onReloadConflict={handleReloadConflict}
+            onSaveAsConflictCopy={handleSaveAsConflictCopy}
+            onSave={saveNow}
+            onSwitchToIR={() => handleSwitchEditorMode("ir")}
           onToggleZen={toggleZenMode}
           onCursorActivity={(line) => setCursorLine(line)}
           shortcuts={settings.shortcuts}
@@ -1303,5 +1311,6 @@ export default function App() {
         />
       )}
     </AppShell>
+    </>
   );
 }

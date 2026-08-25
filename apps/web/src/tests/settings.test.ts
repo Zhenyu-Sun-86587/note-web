@@ -203,4 +203,75 @@ describe("useSettings and settings management", () => {
       shift: true,
     });
   });
+
+  it("supports new theme presets and computes effectiveColorScheme correctly", () => {
+    const { result } = renderHook(() => useSettings());
+
+    act(() => {
+      result.current.updateSetting("theme", "tokyo-night");
+    });
+    expect(result.current.settings.theme).toBe("tokyo-night");
+    expect(result.current.effectiveTheme).toBe("tokyo-night");
+    expect(result.current.effectiveColorScheme).toBe("dark");
+
+    act(() => {
+      result.current.updateSetting("theme", "everforest-light");
+    });
+    expect(result.current.settings.theme).toBe("everforest-light");
+    expect(result.current.effectiveTheme).toBe("everforest-light");
+    expect(result.current.effectiveColorScheme).toBe("light");
+
+    act(() => {
+      result.current.updateSetting("theme", "catppuccin-mocha");
+    });
+    expect(result.current.effectiveColorScheme).toBe("dark");
+
+    act(() => {
+      result.current.updateSetting("theme", "nord-light");
+    });
+    expect(result.current.effectiveColorScheme).toBe("light");
+  });
+
+  it("applies background image settings and variables", () => {
+    applySettings(
+      {
+        ...DEFAULT_SETTINGS,
+        bgImage: "data:image/png;base64,mockImage",
+        bgOpacity: 0.5,
+        bgBlur: 10,
+        bgBrightness: 120,
+        bgGrayscale: 15,
+        bgFit: "cover",
+      },
+      "tokyo-night",
+      "dark",
+    );
+
+    expect(document.documentElement.getAttribute("data-theme")).toBe("tokyo-night");
+    expect(document.documentElement.getAttribute("data-color-scheme")).toBe("dark");
+    expect(document.documentElement.getAttribute("data-has-bg")).toBe("true");
+
+    const styleEl = document.getElementById("note-web-runtime-settings");
+    expect(styleEl?.textContent).toContain('--app-bg-image: url("data:image/png;base64,mockImage")');
+    expect(styleEl?.textContent).toContain("--app-bg-opacity: 0.5");
+    expect(styleEl?.textContent).toContain("--app-bg-blur: 10px");
+    expect(styleEl?.textContent).toContain("--app-bg-brightness: 120%");
+    expect(styleEl?.textContent).toContain("--app-bg-grayscale: 15%");
+    expect(styleEl?.textContent).toContain("--app-bg-size: cover");
+  });
+
+  it("removes data-has-bg when bgImage is null or empty", () => {
+    applySettings(
+      {
+        ...DEFAULT_SETTINGS,
+        bgImage: null,
+      },
+      "light",
+      "light",
+    );
+
+    expect(document.documentElement.getAttribute("data-has-bg")).toBeNull();
+    const styleEl = document.getElementById("note-web-runtime-settings");
+    expect(styleEl?.textContent).toContain("--app-bg-image: none");
+  });
 });

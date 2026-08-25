@@ -5,9 +5,26 @@ import {
   type ShortcutBinding,
 } from "../utils/vim-keyboard";
 
-export type ThemePreference = "system" | "light" | "dark";
+export type ThemePreference =
+  | "system"
+  | "light"
+  | "dark"
+  | "tokyo-night"
+  | "tokyo-night-light"
+  | "everforest-dark"
+  | "everforest-light"
+  | "catppuccin-mocha"
+  | "catppuccin-latte"
+  | "nord"
+  | "nord-light"
+  | "gruvbox-dark"
+  | "gruvbox-light"
+  | "rose-pine"
+  | "one-dark";
+
 export type EditorMode = "ir" | "vim";
 export type StartupNoteMode = "last" | "first" | "none";
+export type BgFit = "cover" | "contain" | "repeat";
 
 export interface AppSettings {
   theme: ThemePreference;
@@ -25,6 +42,12 @@ export interface AppSettings {
   monoFont: string;
   sidebarWidth: number;
   shortcuts?: Partial<Record<AppAction, ShortcutBinding>>;
+  bgImage: string | null;
+  bgOpacity: number;
+  bgBlur: number;
+  bgBrightness: number;
+  bgGrayscale: number;
+  bgFit: BgFit;
 }
 
 export const SETTINGS_KEY = "note-web-settings-v1";
@@ -49,7 +72,31 @@ export const DEFAULT_SETTINGS: AppSettings = {
     '"NoteWeb Mono CJK", "Maple Mono CN", "Sarasa Mono SC", "Noto Sans Mono CJK SC", ui-monospace, monospace',
   sidebarWidth: 280,
   shortcuts: { ...DEFAULT_APP_SHORTCUTS },
+  bgImage: null,
+  bgOpacity: 0.35,
+  bgBlur: 0,
+  bgBrightness: 100,
+  bgGrayscale: 0,
+  bgFit: "cover",
 };
+
+export function isDarkTheme(
+  theme: ThemePreference,
+  systemTheme: "light" | "dark",
+): boolean {
+  if (theme === "system") {
+    return systemTheme === "dark";
+  }
+  const lightThemes: ThemePreference[] = [
+    "light",
+    "tokyo-night-light",
+    "everforest-light",
+    "catppuccin-latte",
+    "nord-light",
+    "gruvbox-light",
+  ];
+  return !lightThemes.includes(theme);
+}
 
 export function loadSettings(): AppSettings {
   if (typeof window === "undefined" || !window.localStorage) {
@@ -86,11 +133,20 @@ export function loadSettings(): AppSettings {
 
 export function applySettings(
   settings: AppSettings,
-  resolvedTheme: "light" | "dark",
+  effectiveTheme: string,
+  effectiveColorScheme: "light" | "dark" = "dark",
 ) {
   if (typeof document === "undefined") return;
 
-  document.documentElement.setAttribute("data-theme", resolvedTheme);
+  document.documentElement.setAttribute("data-theme", effectiveTheme);
+  document.documentElement.setAttribute("data-color-scheme", effectiveColorScheme);
+
+  const hasBg = Boolean(settings.bgImage && settings.bgImage.trim().length > 0);
+  if (hasBg) {
+    document.documentElement.setAttribute("data-has-bg", "true");
+  } else {
+    document.documentElement.removeAttribute("data-has-bg");
+  }
 
   let styleEl = document.getElementById(
     "note-web-runtime-settings",
@@ -109,6 +165,11 @@ export function applySettings(
   const maxWidth =
     settings.editorMaxWidth === null ? "none" : `${settings.editorMaxWidth}px`;
 
+  const bgImageCss =
+    hasBg && settings.bgImage ? `url(${JSON.stringify(settings.bgImage)})` : "none";
+  const bgRepeatCss = settings.bgFit === "repeat" ? "repeat" : "no-repeat";
+  const bgSizeCss = settings.bgFit === "repeat" ? "auto" : (settings.bgFit || "cover");
+
   styleEl.textContent = `
 :root {
   --font-ui: ${settings.uiFont};
@@ -119,6 +180,14 @@ export function applySettings(
   --editor-max-width: ${maxWidth};
   --editor-padding-x: ${settings.editorPaddingX}px;
   --sidebar-width: ${settings.sidebarWidth}px;
+
+  --app-bg-image: ${bgImageCss};
+  --app-bg-opacity: ${settings.bgOpacity ?? 0.35};
+  --app-bg-blur: ${settings.bgBlur ?? 0}px;
+  --app-bg-brightness: ${settings.bgBrightness ?? 100}%;
+  --app-bg-grayscale: ${settings.bgGrayscale ?? 0}%;
+  --app-bg-size: ${bgSizeCss};
+  --app-bg-repeat: ${bgRepeatCss};
 }
   `;
 }
@@ -174,7 +243,14 @@ export function useSettings() {
     }
   }, []);
 
-  const effectiveTheme: "light" | "dark" =
+  const effectiveColorScheme: "light" | "dark" = isDarkTheme(
+    settings.theme,
+    systemTheme,
+  )
+    ? "dark"
+    : "light";
+
+  const effectiveTheme: string =
     settings.theme === "system" ? systemTheme : settings.theme;
 
   useEffect(() => {
@@ -183,8 +259,8 @@ export function useSettings() {
     } catch {
       // ignore storage write errors
     }
-    applySettings(settings, effectiveTheme);
-  }, [settings, effectiveTheme]);
+    applySettings(settings, effectiveTheme, effectiveColorScheme);
+  }, [settings, effectiveTheme, effectiveColorScheme]);
 
   const updateSetting = useCallback(
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -203,6 +279,7 @@ export function useSettings() {
   return {
     settings,
     effectiveTheme,
+    effectiveColorScheme,
     updateSetting,
     setSettings,
     resetSettings,

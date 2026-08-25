@@ -1,0 +1,21 @@
+html[data-theme="nord-light"] {
+  --app-bg: #eceff4;
+  --panel-bg: #e5e9f0;
+  --panel-border: #d8dee9;
+  --editor-bg: #eceff4;
+  --text-primary: #2e3440;
+  --text-muted: #4c566a;
+  --border-color: #d8dee9;
+  --hover-bg: #d8dee9;
+  --active-bg: #c2c8d2;
+  --selected-bg: #d0e4ea;
+  --selected-text: #5e81ac;
+  --accent: #5e81ac;
+  --accent-hover: #81a1c1;
+  --danger: #bf616a;
+  --danger-bg: #fbeae8;
+  --warning-bg: #fcf7e6;
+  --warning-border: #d08770;
+  --warning-text: #d08770;
+  --modal-overlay: rgba(0, 0, 0, 0.4);
+}

@@ -1,0 +1,21 @@
+html[data-theme="catppuccin-mocha"] {
+  --app-bg: #1e1e2e;
+  --panel-bg: #181825;
+  --panel-border: #313244;
+  --editor-bg: #1e1e2e;
+  --text-primary: #cdd6f4;
+  --text-muted: #a6adc8;
+  --border-color: #313244;
+  --hover-bg: #313244;
+  --active-bg: #45475a;
+  --selected-bg: #45475a;
+  --selected-text: #cba6f7;
+  --accent: #cba6f7;
+  --accent-hover: #b4befe;
+  --danger: #f38ba8;
+  --danger-bg: #33222a;
+  --warning-bg: #332d20;
+  --warning-border: #f9e2af;
+  --warning-text: #f9e2af;
+  --modal-overlay: rgba(0, 0, 0, 0.65);
+}

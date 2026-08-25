@@ -1,0 +1,21 @@
+html[data-theme="one-dark"] {
+  --app-bg: #282c34;
+  --panel-bg: #21252b;
+  --panel-border: #181a1f;
+  --editor-bg: #282c34;
+  --text-primary: #abb2bf;
+  --text-muted: #5c6370;
+  --border-color: #3b4048;
+  --hover-bg: #2c313a;
+  --active-bg: #3e4451;
+  --selected-bg: #3e4451;
+  --selected-text: #61afef;
+  --accent: #61afef;
+  --accent-hover: #528bff;
+  --danger: #e06c75;
+  --danger-bg: #3a2225;
+  --warning-bg: #3b3626;
+  --warning-border: #e5c07b;
+  --warning-text: #e5c07b;
+  --modal-overlay: rgba(0, 0, 0, 0.65);
+}

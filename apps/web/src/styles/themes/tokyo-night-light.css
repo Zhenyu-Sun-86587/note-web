@@ -1,0 +1,21 @@
+html[data-theme="tokyo-night-light"] {
+  --app-bg: #e1e2e7;
+  --panel-bg: #e9e9ed;
+  --panel-border: #c8ccd6;
+  --editor-bg: #e1e2e7;
+  --text-primary: #343b58;
+  --text-muted: #6172b0;
+  --border-color: #d5d6db;
+  --hover-bg: #dcdde2;
+  --active-bg: #cbccd1;
+  --selected-bg: #b4d0fe;
+  --selected-text: #2e7de9;
+  --accent: #2e7de9;
+  --accent-hover: #1858bd;
+  --danger: #f52a65;
+  --danger-bg: #fbe2e8;
+  --warning-bg: #fbf3db;
+  --warning-border: #8c6c3e;
+  --warning-text: #8c6c3e;
+  --modal-overlay: rgba(0, 0, 0, 0.4);
+}

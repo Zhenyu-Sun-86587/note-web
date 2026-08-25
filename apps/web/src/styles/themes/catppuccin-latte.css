@@ -1,0 +1,21 @@
+html[data-theme="catppuccin-latte"] {
+  --app-bg: #eff1f5;
+  --panel-bg: #e6e9ef;
+  --panel-border: #ccd0da;
+  --editor-bg: #eff1f5;
+  --text-primary: #4c4f69;
+  --text-muted: #6c6f85;
+  --border-color: #ccd0da;
+  --hover-bg: #ccd0da;
+  --active-bg: #bcc0cc;
+  --selected-bg: #dce0e8;
+  --selected-text: #8839ef;
+  --accent: #8839ef;
+  --accent-hover: #7287fd;
+  --danger: #d20f39;
+  --danger-bg: #fce6e9;
+  --warning-bg: #fef5dc;
+  --warning-border: #df8e1d;
+  --warning-text: #df8e1d;
+  --modal-overlay: rgba(0, 0, 0, 0.4);
+}

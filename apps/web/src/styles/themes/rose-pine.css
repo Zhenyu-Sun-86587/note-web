@@ -1,0 +1,21 @@
+html[data-theme="rose-pine"] {
+  --app-bg: #191724;
+  --panel-bg: #1f1d2e;
+  --panel-border: #26233a;
+  --editor-bg: #191724;
+  --text-primary: #e0def4;
+  --text-muted: #6e6a86;
+  --border-color: #26233a;
+  --hover-bg: #2a283e;
+  --active-bg: #393552;
+  --selected-bg: #31748f;
+  --selected-text: #e0def4;
+  --accent: #ebbcba;
+  --accent-hover: #f6c177;
+  --danger: #eb6f92;
+  --danger-bg: #2d1c25;
+  --warning-bg: #2e281b;
+  --warning-border: #f6c177;
+  --warning-text: #f6c177;
+  --modal-overlay: rgba(0, 0, 0, 0.65);
+}
