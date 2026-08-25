@@ -48,6 +48,7 @@ export interface AppSettings {
   bgBrightness: number;
   bgGrayscale: number;
   bgFit: BgFit;
+  bgGlassmorphism: boolean;
 }
 
 export const SETTINGS_KEY = "note-web-settings-v1";
@@ -78,6 +79,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bgBrightness: 100,
   bgGrayscale: 0,
   bgFit: "cover",
+  bgGlassmorphism: true,
 };
 
 export function isDarkTheme(
@@ -144,8 +146,13 @@ export function applySettings(
   const hasBg = Boolean(settings.bgImage && settings.bgImage.trim().length > 0);
   if (hasBg) {
     document.documentElement.setAttribute("data-has-bg", "true");
+    document.documentElement.setAttribute(
+      "data-bg-glassmorphism",
+      settings.bgGlassmorphism !== false ? "true" : "false",
+    );
   } else {
     document.documentElement.removeAttribute("data-has-bg");
+    document.documentElement.removeAttribute("data-bg-glassmorphism");
   }
 
   let styleEl = document.getElementById(

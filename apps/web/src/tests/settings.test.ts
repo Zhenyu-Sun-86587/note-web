@@ -250,6 +250,7 @@ describe("useSettings and settings management", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("tokyo-night");
     expect(document.documentElement.getAttribute("data-color-scheme")).toBe("dark");
     expect(document.documentElement.getAttribute("data-has-bg")).toBe("true");
+    expect(document.documentElement.getAttribute("data-bg-glassmorphism")).toBe("true");
 
     const styleEl = document.getElementById("note-web-runtime-settings");
     expect(styleEl?.textContent).toContain('--app-bg-image: url("data:image/png;base64,mockImage")');
@@ -258,6 +259,21 @@ describe("useSettings and settings management", () => {
     expect(styleEl?.textContent).toContain("--app-bg-brightness: 120%");
     expect(styleEl?.textContent).toContain("--app-bg-grayscale: 15%");
     expect(styleEl?.textContent).toContain("--app-bg-size: cover");
+  });
+
+  it("sets data-bg-glassmorphism to false when disabled", () => {
+    applySettings(
+      {
+        ...DEFAULT_SETTINGS,
+        bgImage: "data:image/png;base64,mockImage",
+        bgGlassmorphism: false,
+      },
+      "tokyo-night",
+      "dark",
+    );
+
+    expect(document.documentElement.getAttribute("data-has-bg")).toBe("true");
+    expect(document.documentElement.getAttribute("data-bg-glassmorphism")).toBe("false");
   });
 
   it("removes data-has-bg when bgImage is null or empty", () => {

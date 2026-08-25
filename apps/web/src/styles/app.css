@@ -1392,37 +1392,62 @@ kbd {
   background-repeat: var(--app-bg-repeat, no-repeat);
   filter: blur(var(--app-bg-blur, 0px)) brightness(var(--app-bg-brightness, 100%)) grayscale(var(--app-bg-grayscale, 0%));
   opacity: var(--app-bg-opacity, 0.35);
-  transform: scale(1.04);
+  transform: scale(1.02);
   transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
+html[data-has-bg="true"] body,
+html[data-has-bg="true"] #root,
 html[data-has-bg="true"] .app-shell {
-  background-color: transparent;
+  background-color: transparent !important;
 }
 
+/* Glassmorphism enabled (default with data-has-bg="true") */
 html[data-has-bg="true"] .sidebar-container {
-  background-color: color-mix(in srgb, var(--panel-bg) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: color-mix(in srgb, var(--panel-bg) 65%, transparent) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+}
+
+html[data-has-bg="true"] .sidebar,
+html[data-has-bg="true"] .sidebar-content,
+html[data-has-bg="true"] .file-tree {
+  background-color: transparent !important;
+}
+
+html[data-has-bg="true"] .sidebar-header,
+html[data-has-bg="true"] .sidebar-quick-open {
+  background-color: transparent !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+}
+
+html[data-has-bg="true"] .quick-open-btn {
+  background-color: color-mix(in srgb, var(--app-bg) 50%, transparent) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
 html[data-has-bg="true"] .main-container {
-  background-color: color-mix(in srgb, var(--app-bg) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: color-mix(in srgb, var(--app-bg) 62%, transparent) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 html[data-has-bg="true"] .topbar,
 html[data-has-bg="true"] .statusbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background-color: color-mix(in srgb, var(--panel-bg) 65%, transparent) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
 html[data-has-bg="true"] .tab-bar {
-  background-color: color-mix(in srgb, var(--panel-bg) 78%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background-color: color-mix(in srgb, var(--panel-bg) 58%, transparent) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
 html[data-has-bg="true"] .editor-with-outline-container,
@@ -1441,9 +1466,10 @@ html[data-has-bg="true"] .vditor-reset {
 }
 
 html[data-has-bg="true"] .vditor-toolbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 75%, transparent) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background-color: color-mix(in srgb, var(--panel-bg) 60%, transparent) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
 html[data-has-bg="true"] .vim-markdown-editor,
@@ -1456,19 +1482,66 @@ html[data-has-bg="true"] .cm-scroller {
 
 html[data-has-bg="true"] .vim-split-preview,
 html[data-has-bg="true"] .note-web-markdown-preview {
-  background-color: color-mix(in srgb, var(--app-bg) 75%, transparent) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-html[data-has-bg="true"] .cm-gutters {
-  background-color: color-mix(in srgb, var(--panel-bg) 50%, transparent) !important;
-}
-
-html[data-has-bg="true"] .outline-panel {
-  background-color: color-mix(in srgb, var(--panel-bg) 85%, transparent);
+  background-color: color-mix(in srgb, var(--app-bg) 60%, transparent) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
+html[data-has-bg="true"] .cm-gutters {
+  background-color: color-mix(in srgb, var(--panel-bg) 45%, transparent) !important;
+}
+
+html[data-has-bg="true"] .outline-panel {
+  background-color: color-mix(in srgb, var(--panel-bg) 70%, transparent) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-left: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+}
+
+/* Glassmorphism disabled (pure transparent / crisp full page panorama) */
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .main-container,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .topbar,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .statusbar,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .tab-bar,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-toolbar,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .outline-panel,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .quick-open-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container {
+  background-color: color-mix(in srgb, var(--panel-bg) 35%, transparent) !important;
+}
+
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .main-container {
+  background-color: color-mix(in srgb, var(--app-bg) 28%, transparent) !important;
+}
+
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .topbar,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .statusbar {
+  background-color: color-mix(in srgb, var(--panel-bg) 35%, transparent) !important;
+}
+
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .tab-bar {
+  background-color: color-mix(in srgb, var(--panel-bg) 25%, transparent) !important;
+}
+
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-toolbar {
+  background-color: color-mix(in srgb, var(--panel-bg) 25%, transparent) !important;
+}
+
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .outline-panel {
+  background-color: color-mix(in srgb, var(--panel-bg) 35%, transparent) !important;
+}
+
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview {
+  background-color: color-mix(in srgb, var(--app-bg) 25%, transparent) !important;
+}
+
 
 

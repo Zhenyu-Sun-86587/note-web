@@ -401,8 +401,27 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   />
                   <div className="settings-bg-preview-info">
                     <div className="settings-bg-preview-title">自定义背景已启用</div>
-                    <div className="settings-bg-preview-hint">各面板自动启用毛玻璃半透明透显效果</div>
+                    <div className="settings-bg-preview-hint">壁纸已平铺于全页面底图层</div>
                   </div>
+                </div>
+
+                <div className="settings-row">
+                  <div className="settings-label">
+                    <div>毛玻璃磨砂特效</div>
+                    <div className="settings-sublabel">
+                      为全页面侧边栏、顶栏和面板添加磨砂毛玻璃透显（关闭后为通透全景）
+                    </div>
+                  </div>
+                  <label className="settings-toggle">
+                    <input
+                      type="checkbox"
+                      checked={settings.bgGlassmorphism ?? true}
+                      onChange={(e) =>
+                        onUpdateSetting("bgGlassmorphism", e.target.checked)
+                      }
+                    />
+                    <span className="settings-toggle-slider" />
+                  </label>
                 </div>
 
                 <div className="settings-row">
