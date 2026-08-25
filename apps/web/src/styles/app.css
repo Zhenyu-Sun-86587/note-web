@@ -1501,6 +1501,22 @@ html[data-color-scheme="light"][data-has-bg="true"] .quick-open-btn {
   border-color: rgba(0, 0, 0, 0.1);
 }
 
+/* Light Mode Code Blocks Translucency */
+html[data-color-scheme="light"][data-has-bg="true"] .vditor-reset pre,
+html[data-color-scheme="light"][data-has-bg="true"] .markdown-preview-content pre {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+html[data-color-scheme="light"][data-has-bg="true"] .vditor-reset code:not(.hljs):not(.highlight-chroma),
+html[data-color-scheme="light"][data-has-bg="true"] .markdown-preview-content code {
+  background-color: rgba(255, 255, 255, 0.50) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
 /* Light Mode Glassmorphism Disabled */
 html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container {
   background-color: rgba(255, 255, 255, 0.40) !important;
@@ -1526,6 +1542,13 @@ html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false
 html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
 html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview {
   background-color: rgba(255, 255, 255, 0.35) !important;
+}
+
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-reset pre,
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre {
+  background-color: rgba(255, 255, 255, 0.40) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* ========================================================
@@ -1589,6 +1612,22 @@ html[data-color-scheme="dark"][data-has-bg="true"] .cm-gutters {
   background-color: rgba(0, 0, 0, 0.35) !important;
 }
 
+/* Dark Mode Code Blocks Translucency */
+html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset pre,
+html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content pre {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset code:not(.hljs):not(.highlight-chroma),
+html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content code {
+  background-color: rgba(0, 0, 0, 0.40) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
 /* Dark mode text sharpness & contrast elevation */
 html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset,
 html[data-color-scheme="dark"][data-has-bg="true"] .cm-content,
@@ -1600,12 +1639,6 @@ html[data-color-scheme="dark"][data-has-bg="true"] .sidebar-title,
 html[data-color-scheme="dark"][data-has-bg="true"] .file-tree-item,
 html[data-color-scheme="dark"][data-has-bg="true"] .tab-item {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset pre,
-html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content pre {
-  background-color: var(--code-bg) !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 
 /* Dark Mode Glassmorphism Disabled */
@@ -1635,6 +1668,13 @@ html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"
   background-color: rgba(0, 0, 0, 0.40) !important;
 }
 
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-reset pre,
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre {
+  background-color: rgba(0, 0, 0, 0.40) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* Global glassmorphism disabled rule to strip backdrop-filter */
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .main-container,
@@ -1645,7 +1685,9 @@ html[data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-toolbar,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .outline-panel,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview,
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .quick-open-btn {
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .quick-open-btn,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-reset pre,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
