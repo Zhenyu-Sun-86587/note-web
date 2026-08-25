@@ -1379,6 +1379,20 @@ kbd {
 }
 
 /* Background Image Layer & Translucency */
+html[data-has-bg="true"] {
+  background-color: #ffffff !important;
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] {
+  background-color: #000000 !important;
+}
+
+html[data-has-bg="true"] body,
+html[data-has-bg="true"] #root,
+html[data-has-bg="true"] .app-shell {
+  background-color: transparent !important;
+}
+
 .app-background-layer {
   position: fixed;
   inset: 0;
@@ -1396,20 +1410,6 @@ kbd {
   transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
-html[data-has-bg="true"] body,
-html[data-has-bg="true"] #root,
-html[data-has-bg="true"] .app-shell {
-  background-color: transparent !important;
-}
-
-/* Glassmorphism enabled (default with data-has-bg="true") */
-html[data-has-bg="true"] .sidebar-container {
-  background-color: color-mix(in srgb, var(--panel-bg) 65%, transparent) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-right: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
-}
-
 html[data-has-bg="true"] .sidebar,
 html[data-has-bg="true"] .sidebar-content,
 html[data-has-bg="true"] .file-tree {
@@ -1419,35 +1419,6 @@ html[data-has-bg="true"] .file-tree {
 html[data-has-bg="true"] .sidebar-header,
 html[data-has-bg="true"] .sidebar-quick-open {
   background-color: transparent !important;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
-}
-
-html[data-has-bg="true"] .quick-open-btn {
-  background-color: color-mix(in srgb, var(--app-bg) 50%, transparent) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
-}
-
-html[data-has-bg="true"] .main-container {
-  background-color: color-mix(in srgb, var(--app-bg) 62%, transparent) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-html[data-has-bg="true"] .topbar,
-html[data-has-bg="true"] .statusbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 65%, transparent) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
-}
-
-html[data-has-bg="true"] .tab-bar {
-  background-color: color-mix(in srgb, var(--panel-bg) 58%, transparent) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
 html[data-has-bg="true"] .editor-with-outline-container,
@@ -1465,13 +1436,6 @@ html[data-has-bg="true"] .vditor-reset {
   background-color: transparent !important;
 }
 
-html[data-has-bg="true"] .vditor-toolbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 60%, transparent) !important;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
-}
-
 html[data-has-bg="true"] .vim-markdown-editor,
 html[data-has-bg="true"] .vim-split-container,
 html[data-has-bg="true"] .vim-split-editor,
@@ -1480,25 +1444,198 @@ html[data-has-bg="true"] .cm-scroller {
   background-color: transparent !important;
 }
 
-html[data-has-bg="true"] .vim-split-preview,
-html[data-has-bg="true"] .note-web-markdown-preview {
-  background-color: color-mix(in srgb, var(--app-bg) 60%, transparent) !important;
+/* ========================================================
+   LIGHT THEME: White-based translucent panels
+   ======================================================== */
+html[data-color-scheme="light"][data-has-bg="true"] .sidebar-container {
+  background-color: rgba(255, 255, 255, 0.70) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html[data-color-scheme="light"][data-has-bg="true"] .main-container {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+html[data-color-scheme="light"][data-has-bg="true"] .topbar,
+html[data-color-scheme="light"][data-has-bg="true"] .statusbar {
+  background-color: rgba(255, 255, 255, 0.70) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+html[data-color-scheme="light"][data-has-bg="true"] .tab-bar {
+  background-color: rgba(255, 255, 255, 0.60) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html[data-color-scheme="light"][data-has-bg="true"] .vditor-toolbar {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html[data-color-scheme="light"][data-has-bg="true"] .outline-panel {
+  background-color: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html[data-color-scheme="light"][data-has-bg="true"] .vim-split-preview,
+html[data-color-scheme="light"][data-has-bg="true"] .note-web-markdown-preview {
+  background-color: rgba(255, 255, 255, 0.65) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 
-html[data-has-bg="true"] .cm-gutters {
-  background-color: color-mix(in srgb, var(--panel-bg) 45%, transparent) !important;
+html[data-color-scheme="light"][data-has-bg="true"] .quick-open-btn {
+  background-color: rgba(255, 255, 255, 0.55) !important;
+  border-color: rgba(0, 0, 0, 0.1);
 }
 
-html[data-has-bg="true"] .outline-panel {
-  background-color: color-mix(in srgb, var(--panel-bg) 70%, transparent) !important;
+/* Light Mode Glassmorphism Disabled */
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container {
+  background-color: rgba(255, 255, 255, 0.40) !important;
+}
+
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .main-container {
+  background-color: rgba(255, 255, 255, 0.35) !important;
+}
+
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .topbar,
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .statusbar {
+  background-color: rgba(255, 255, 255, 0.40) !important;
+}
+
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .tab-bar {
+  background-color: rgba(255, 255, 255, 0.30) !important;
+}
+
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .outline-panel {
+  background-color: rgba(255, 255, 255, 0.40) !important;
+}
+
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview {
+  background-color: rgba(255, 255, 255, 0.35) !important;
+}
+
+/* ========================================================
+   DARK THEME: Black-based translucent panels & OLED canvas
+   ======================================================== */
+html[data-color-scheme="dark"][data-has-bg="true"] .sidebar-container {
+  background-color: rgba(0, 0, 0, 0.60) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .main-container {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .topbar,
+html[data-color-scheme="dark"][data-has-bg="true"] .statusbar {
+  background-color: rgba(0, 0, 0, 0.60) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-left: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Glassmorphism disabled (pure transparent / crisp full page panorama) */
+html[data-color-scheme="dark"][data-has-bg="true"] .tab-bar {
+  background-color: rgba(0, 0, 0, 0.50) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .vditor-toolbar {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .outline-panel {
+  background-color: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .vim-split-preview,
+html[data-color-scheme="dark"][data-has-bg="true"] .note-web-markdown-preview {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .quick-open-btn {
+  background-color: rgba(0, 0, 0, 0.40) !important;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .cm-gutters {
+  background-color: rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Dark mode text sharpness & contrast elevation */
+html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset,
+html[data-color-scheme="dark"][data-has-bg="true"] .cm-content,
+html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .sidebar-title,
+html[data-color-scheme="dark"][data-has-bg="true"] .file-tree-item,
+html[data-color-scheme="dark"][data-has-bg="true"] .tab-item {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset pre,
+html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content pre {
+  background-color: var(--code-bg) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* Dark Mode Glassmorphism Disabled */
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .main-container {
+  background-color: rgba(0, 0, 0, 0.40) !important;
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .topbar,
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .statusbar {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .tab-bar {
+  background-color: rgba(0, 0, 0, 0.35) !important;
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .outline-panel {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview {
+  background-color: rgba(0, 0, 0, 0.40) !important;
+}
+
+/* Global glassmorphism disabled rule to strip backdrop-filter */
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .main-container,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .topbar,
@@ -1513,120 +1650,6 @@ html[data-has-bg="true"][data-bg-glassmorphism="false"] .quick-open-btn {
   -webkit-backdrop-filter: none !important;
 }
 
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container {
-  background-color: color-mix(in srgb, var(--panel-bg) 35%, transparent) !important;
-}
-
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .main-container {
-  background-color: color-mix(in srgb, var(--app-bg) 28%, transparent) !important;
-}
-
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .topbar,
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .statusbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 35%, transparent) !important;
-}
-
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .tab-bar {
-  background-color: color-mix(in srgb, var(--panel-bg) 25%, transparent) !important;
-}
-
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-toolbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 25%, transparent) !important;
-}
-
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .outline-panel {
-  background-color: color-mix(in srgb, var(--panel-bg) 35%, transparent) !important;
-}
-
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview {
-  background-color: color-mix(in srgb, var(--app-bg) 25%, transparent) !important;
-}
-
-/* Dark Mode Contrast Optimization for Background Wallpaper */
-html[data-color-scheme="dark"] .app-background-layer::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.55) 100%);
-  pointer-events: none;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .sidebar-container {
-  background-color: color-mix(in srgb, var(--panel-bg) 78%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .main-container {
-  background-color: color-mix(in srgb, var(--app-bg) 76%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .topbar,
-html[data-color-scheme="dark"][data-has-bg="true"] .statusbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 78%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .tab-bar {
-  background-color: color-mix(in srgb, var(--panel-bg) 72%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .vditor-toolbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 75%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .outline-panel {
-  background-color: color-mix(in srgb, var(--panel-bg) 80%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .vim-split-preview,
-html[data-color-scheme="dark"][data-has-bg="true"] .note-web-markdown-preview {
-  background-color: color-mix(in srgb, var(--app-bg) 75%, transparent) !important;
-}
-
-/* Dark mode text sharpness & contrast elevation */
-html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset,
-html[data-color-scheme="dark"][data-has-bg="true"] .cm-content,
-html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .sidebar-title,
-html[data-color-scheme="dark"][data-has-bg="true"] .file-tree-item,
-html[data-color-scheme="dark"][data-has-bg="true"] .tab-item {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset pre,
-html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content pre {
-  background-color: var(--code-bg) !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-}
-
-/* Dark mode glassmorphism disabled adjustments */
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .sidebar-container {
-  background-color: color-mix(in srgb, var(--panel-bg) 55%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .main-container {
-  background-color: color-mix(in srgb, var(--app-bg) 50%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .topbar,
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .statusbar {
-  background-color: color-mix(in srgb, var(--panel-bg) 55%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .tab-bar {
-  background-color: color-mix(in srgb, var(--panel-bg) 45%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .outline-panel {
-  background-color: color-mix(in srgb, var(--panel-bg) 55%, transparent) !important;
-}
-
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview {
-  background-color: color-mix(in srgb, var(--app-bg) 48%, transparent) !important;
-}
 
 
 
