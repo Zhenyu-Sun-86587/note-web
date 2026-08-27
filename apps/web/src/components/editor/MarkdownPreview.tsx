@@ -1,5 +1,6 @@
-import { useMemo, useRef, useImperativeHandle, forwardRef } from "react";
+import { useMemo, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { renderMarkdown } from "../../utils/markdown-renderer";
+import { renderMermaidInElement } from "../../utils/mermaid";
 import { Link2, Link2Off } from "lucide-react";
 
 export interface MarkdownPreviewHandle {
@@ -24,6 +25,7 @@ export const MarkdownPreview = forwardRef<
     {
       notePath,
       content,
+      theme = "dark",
       syncScrollEnabled = true,
       onToggleSyncScroll,
       onScroll,
@@ -37,6 +39,12 @@ export const MarkdownPreview = forwardRef<
     const html = useMemo(() => {
       return renderMarkdown(content, notePath);
     }, [content, notePath]);
+
+    useEffect(() => {
+      if (containerRef.current) {
+        renderMermaidInElement(containerRef.current, theme);
+      }
+    }, [html, theme]);
 
     useImperativeHandle(
       ref,

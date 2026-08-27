@@ -1368,6 +1368,64 @@ kbd {
   text-decoration: underline;
 }
 
+/* Mermaid Diagrams */
+.mermaid-block {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 16px;
+  background-color: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+}
+
+.mermaid-diagram svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.mermaid-error-box {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background-color: var(--danger-bg);
+  border: 1px solid var(--danger);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.mermaid-error-title {
+  font-weight: 600;
+  color: var(--danger);
+  margin-bottom: 6px;
+}
+
+.mermaid-error-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: var(--danger);
+}
+
+.mermaid-error-source {
+  background-color: rgba(0, 0, 0, 0.08);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  overflow-x: auto;
+}
+
+
 /* Zen Mode Adjustments */
 .app-shell.zen-mode .tab-bar {
   display: none !important;
@@ -1501,9 +1559,10 @@ html[data-color-scheme="light"][data-has-bg="true"] .quick-open-btn {
   border-color: rgba(0, 0, 0, 0.1);
 }
 
-/* Light Mode Code Blocks Translucency */
+/* Light Mode Code Blocks & Mermaid Translucency */
 html[data-color-scheme="light"][data-has-bg="true"] .vditor-reset pre,
-html[data-color-scheme="light"][data-has-bg="true"] .markdown-preview-content pre {
+html[data-color-scheme="light"][data-has-bg="true"] .markdown-preview-content pre,
+html[data-color-scheme="light"][data-has-bg="true"] .mermaid-block {
   background-color: rgba(255, 255, 255, 0.65) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1545,7 +1604,8 @@ html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false
 }
 
 html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-reset pre,
-html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre {
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre,
+html[data-color-scheme="light"][data-has-bg="true"][data-bg-glassmorphism="false"] .mermaid-block {
   background-color: rgba(255, 255, 255, 0.40) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -1612,9 +1672,10 @@ html[data-color-scheme="dark"][data-has-bg="true"] .cm-gutters {
   background-color: rgba(0, 0, 0, 0.35) !important;
 }
 
-/* Dark Mode Code Blocks Translucency */
+/* Dark Mode Code Blocks & Mermaid Translucency */
 html[data-color-scheme="dark"][data-has-bg="true"] .vditor-reset pre,
-html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content pre {
+html[data-color-scheme="dark"][data-has-bg="true"] .markdown-preview-content pre,
+html[data-color-scheme="dark"][data-has-bg="true"] .mermaid-block {
   background-color: rgba(0, 0, 0, 0.55) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1669,7 +1730,8 @@ html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"
 }
 
 html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-reset pre,
-html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre {
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre,
+html[data-color-scheme="dark"][data-has-bg="true"][data-bg-glassmorphism="false"] .mermaid-block {
   background-color: rgba(0, 0, 0, 0.40) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -1687,10 +1749,12 @@ html[data-has-bg="true"][data-bg-glassmorphism="false"] .vim-split-preview,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .note-web-markdown-preview,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .quick-open-btn,
 html[data-has-bg="true"][data-bg-glassmorphism="false"] .vditor-reset pre,
-html[data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre {
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .markdown-preview-content pre,
+html[data-has-bg="true"][data-bg-glassmorphism="false"] .mermaid-block {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
 
 
 

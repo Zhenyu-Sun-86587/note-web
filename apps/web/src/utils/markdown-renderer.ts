@@ -185,10 +185,17 @@ export function renderMarkdown(markdown: string, notePath: string): string {
       }
 
       const endLine = i;
-      const codeContent = escapeHtml(codeLines.join("\n"));
-      out.push(
-        `<pre data-source-line="${startLine}" data-source-end-line="${endLine}"><code class="${lang ? `language-${escapeHtml(lang)}` : ""}">${codeContent}</code></pre>`,
-      );
+      const rawCode = codeLines.join("\n");
+      const codeContent = escapeHtml(rawCode);
+      if (lang.toLowerCase() === "mermaid") {
+        out.push(
+          `<div class="mermaid-block" data-source-line="${startLine}" data-source-end-line="${endLine}"><div class="mermaid-diagram" data-mermaid-code="${codeContent}">${codeContent}</div></div>`,
+        );
+      } else {
+        out.push(
+          `<pre data-source-line="${startLine}" data-source-end-line="${endLine}"><code class="${lang ? `language-${escapeHtml(lang)}` : ""}">${codeContent}</code></pre>`,
+        );
+      }
       continue;
     }
 

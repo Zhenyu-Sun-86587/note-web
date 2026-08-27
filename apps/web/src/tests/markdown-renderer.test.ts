@@ -149,4 +149,11 @@ describe("Markdown Renderer for Vim Preview", () => {
       '<a href="https://example.com" target="_blank" rel="noopener noreferrer"><img src="/api/raw/vim/tmp/orca-paste.png" alt="Screenshot" loading="lazy" /></a>',
     );
   });
+
+  it("renders mermaid fenced code blocks with mermaid-block and mermaid-diagram", () => {
+    const md = "```mermaid\ngraph TD\n    A[Start] --> B[End]\n```";
+    const html = renderMarkdown(md, "inbox/note.md");
+    expect(html).toContain('<div class="mermaid-block" data-source-line="1" data-source-end-line="4">');
+    expect(html).toContain('<div class="mermaid-diagram" data-mermaid-code="graph TD\n    A[Start] --&gt; B[End]">graph TD\n    A[Start] --&gt; B[End]</div>');
+  });
 });
