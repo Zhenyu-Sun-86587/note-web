@@ -117,13 +117,8 @@ export async function renameFolder(
   return handleResponse<{ ok: boolean; oldPath: string; newPath: string }>(res);
 }
 
-export async function deleteFolder(
-  path: string,
-  recursive = false,
-): Promise<void> {
-  const query = new URLSearchParams({ path });
-  if (recursive) query.set("recursive", "true");
-  const res = await fetch(`/api/folder?${query.toString()}`, {
+export async function deleteFolder(path: string): Promise<void> {
+  const res = await fetch(`/api/folder?path=${encodeURIComponent(path)}`, {
     method: "DELETE",
   });
   return handleResponse<void>(res);

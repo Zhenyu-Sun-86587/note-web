@@ -874,7 +874,7 @@ export default function App() {
       await handleCloseTab(deleteTarget.path);
     } else {
       const folder = deleteTarget.path;
-      await deleteFolder(folder, true);
+      await deleteFolder(folder);
       const remainingTabs = tabsRef.current.filter(
         (t) => t.path !== folder && !t.path.startsWith(`${folder}/`),
       );

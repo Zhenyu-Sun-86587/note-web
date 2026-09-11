@@ -48,7 +48,6 @@ export async function renameFolder(
 export async function deleteFolder(
   vaultRoot: string,
   relativePath: string,
-  recursive = false,
 ): Promise<void> {
   const normalized = relativePath
     ? relativePath.replaceAll("\\", "/").trim()
@@ -63,18 +62,5 @@ export async function deleteFolder(
 
   const { fullPath } = await resolveExistingFolderPath(vaultRoot, relativePath);
 
-  const entries = await fs.promises.readdir(fullPath);
-  if (entries.length > 0 && !recursive) {
-    throw new VaultError(
-      "FOLDER_NOT_EMPTY",
-      "Folder is not empty. Recursive deletion must be explicitly requested.",
-      400,
-    );
-  }
-
-  if (recursive) {
-    await fs.promises.rm(fullPath, { recursive: true });
-  } else {
-    await fs.promises.rmdir(fullPath);
-  }
+  await fs.promises.rm(fullPath, { recursive: true });
 }
