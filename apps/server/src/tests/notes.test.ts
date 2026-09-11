@@ -168,4 +168,24 @@ describe("Notes API & CRUD", () => {
       .expect(403);
     expect(patchRootRes.body.error.code).toBe("ACCESS_DENIED");
   });
+
+  it("recursively deletes a non-empty folder only when explicitly requested", async () => {
+    const folderPath = path.join(ctx.vaultRoot, "projects", "recursive-delete");
+    fs.mkdirSync(path.join(folderPath, "nested"), { recursive: true });
+    fs.writeFileSync(path.join(folderPath, "note.md"), "top-level");
+    fs.writeFileSync(path.join(folderPath, "nested", "note.md"), "nested");
+
+    const guardedRes = await request(ctx.app).delete(
+      "/api/folder?path=projects/recursive-delete",
+    );
+    expect(guardedRes.status).toBe(400);
+    expect(guardedRes.body.error.code).toBe("FOLDER_NOT_EMPTY");
+    expect(fs.existsSync(folderPath)).toBe(true);
+
+    const recursiveRes = await request(ctx.app).delete(
+      "/api/folder?path=projects/recursive-delete&recursive=true",
+    );
+    expect(recursiveRes.status).toBe(204);
+    expect(fs.existsSync(folderPath)).toBe(false);
+  });
 });

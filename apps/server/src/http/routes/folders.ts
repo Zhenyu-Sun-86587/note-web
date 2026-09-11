@@ -80,7 +80,8 @@ export function createFoldersRouter(vaultRoot: string): Router {
       }
 
       try {
-        await deleteFolder(vaultRoot, folderPath);
+        const recursive = req.query.recursive === "true";
+        await deleteFolder(vaultRoot, folderPath, recursive);
         res.status(204).end();
       } catch (err: unknown) {
         if (err instanceof VaultError) {
