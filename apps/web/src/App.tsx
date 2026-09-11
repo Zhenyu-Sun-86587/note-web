@@ -579,7 +579,7 @@ export default function App() {
   }, [isDirty]);
 
   // Window Focus Refresh
-  useWindowFocusRefresh(async () => {
+  const handleWindowFocusRefresh = useCallback(async () => {
     const current = openNoteRef.current;
     if (!current) return;
 
@@ -614,7 +614,9 @@ export default function App() {
     } catch {
       // ignore background refresh error
     }
-  });
+  }, [setStatus]);
+
+  useWindowFocusRefresh(handleWindowFocusRefresh);
 
   // Conflict resolution handlers
   const handleReloadConflict = async () => {

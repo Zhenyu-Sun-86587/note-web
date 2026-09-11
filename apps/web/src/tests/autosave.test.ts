@@ -388,6 +388,10 @@ describe("useAutosave hook", () => {
       return { autosave, setDraft, setOpenNote };
     });
 
+    act(() => {
+      result.current.autosave.setStatus("conflict");
+    });
+
     // 1. Conflict occurs, user clicks "重新加载磁盘版本"
     act(() => {
       result.current.setOpenNote({
@@ -418,6 +422,40 @@ describe("useAutosave hook", () => {
       "Content C",
       "rev-2",
     );
+  });
+
+  it("freezes debounced and manual saves until conflict resolution", async () => {
+    const saveNoteMock = vi.mocked(client.saveNote);
+    saveNoteMock.mockReset();
+
+    const { result } = renderHook(() => {
+      const [draft, setDraft] = useState("Local dirty content");
+      const autosave = useAutosave({
+        path: "inbox/test.md",
+        content: draft,
+        revision: "rev-1",
+        enabled: true,
+      });
+      return { autosave, setDraft };
+    });
+
+    act(() => {
+      result.current.autosave.setStatus("conflict");
+      result.current.setDraft("Local dirty content after conflict");
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    let saved = true;
+    await act(async () => {
+      saved = await result.current.autosave.saveNow();
+    });
+
+    expect(saved).toBe(false);
+    expect(result.current.autosave.status).toBe("conflict");
+    expect(saveNoteMock).not.toHaveBeenCalled();
   });
 
   it("flush on a clean note does not call saveNote", async () => {

@@ -22,6 +22,7 @@ export function useAutosave({
   onError,
 }: UseAutosaveOptions) {
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const conflictRef = useRef(false);
 
   const latestContentRef = useRef(content);
   latestContentRef.current = content;
@@ -50,10 +51,28 @@ export function useAutosave({
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
+  const updateStatus = useCallback((newStatus: SaveStatus) => {
+    if (newStatus === "conflict") {
+      conflictRef.current = true;
+      saveAgainRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    } else if (conflictRef.current) {
+      return;
+    }
+    setStatus(newStatus);
+  }, []);
+
   const performSave = useCallback(async (): Promise<boolean> => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
+    }
+
+    if (conflictRef.current) {
+      return false;
     }
 
     const currentPath = latestPathRef.current;
@@ -70,7 +89,7 @@ export function useAutosave({
       return inFlightPromiseRef.current;
     }
 
-    setStatus("saving");
+    updateStatus("saving");
 
     const savePromise = (async () => {
       try {
@@ -78,6 +97,10 @@ export function useAutosave({
         let lastResult = true;
 
         while (shouldLoop) {
+          if (conflictRef.current) {
+            lastResult = false;
+            break;
+          }
           shouldLoop = false;
           saveAgainRef.current = false;
           if (debounceTimerRef.current) {
@@ -96,8 +119,12 @@ export function useAutosave({
 
           savingContentRef.current = c;
           const doc = await saveNote(p, c, r);
+          if (conflictRef.current) {
+            lastResult = false;
+            break;
+          }
           latestRevisionRef.current = doc.revision;
-          setStatus("saved");
+          updateStatus("saved");
           onSavedRef.current?.(doc);
 
           if (
@@ -112,10 +139,10 @@ export function useAutosave({
         saveAgainRef.current = false;
 
         if (err instanceof ClientError && err.statusCode === 409) {
-          setStatus("conflict");
+          updateStatus("conflict");
           onConflictRef.current?.(err);
         } else {
-          setStatus("error");
+          updateStatus("error");
           onErrorRef.current?.(err as Error);
         }
         return false;
@@ -127,12 +154,13 @@ export function useAutosave({
 
     inFlightPromiseRef.current = savePromise;
     return savePromise;
-  }, []);
+  }, [updateStatus]);
 
   // Debounced auto-save effect
   useEffect(() => {
     if (
       !enabled ||
+      conflictRef.current ||
       !path ||
       revision === null ||
       content === savingContentRef.current
@@ -144,14 +172,17 @@ export function useAutosave({
       return;
     }
 
-    setStatus((prev) => (prev === "conflict" ? "conflict" : "dirty"));
+    updateStatus("dirty");
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      if (latestContentRef.current !== savingContentRef.current) {
+      if (
+        !conflictRef.current &&
+        latestContentRef.current !== savingContentRef.current
+      ) {
         performSave();
       }
     }, 1200);
@@ -161,12 +192,15 @@ export function useAutosave({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [content, enabled, path, revision, performSave]);
+  }, [content, enabled, path, revision, performSave, updateStatus]);
 
   const saveNow = useCallback(async (): Promise<boolean> => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
+    }
+    if (conflictRef.current) {
+      return false;
     }
     if (inFlightPromiseRef.current) {
       if (latestContentRef.current !== savingContentRef.current) {
@@ -186,6 +220,7 @@ export function useAutosave({
     if (!inFlightPromiseRef.current) {
       savingContentRef.current = null;
     }
+    conflictRef.current = newStatus === "conflict";
     setStatus(newStatus);
   }, []);
 
@@ -194,6 +229,6 @@ export function useAutosave({
     saveNow,
     flush: saveNow,
     resetStatus,
-    setStatus,
+    setStatus: updateStatus,
   };
 }

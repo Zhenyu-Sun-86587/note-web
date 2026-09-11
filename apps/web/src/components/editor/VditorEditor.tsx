@@ -109,6 +109,8 @@ export const VditorEditor = forwardRef<EditorHandle, VditorEditorProps>(
         "|",
         "list",
         "ordered-list",
+        "outdent",
+        "indent",
         "check",
         "quote",
         "|",
@@ -176,6 +178,44 @@ export const VditorEditor = forwardRef<EditorHandle, VditorEditorProps>(
       const target = e.target as HTMLElement | null;
       if (!target || !hostEl?.contains(target)) return;
       if (!target.closest(".vditor-reset")) return;
+
+      if (
+        e.key === "Tab" &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        const selection = window.getSelection();
+        if (!selection || !selection.isCollapsed || selection.rangeCount === 0) {
+          return;
+        }
+
+        const range = selection.getRangeAt(0);
+        const startElement =
+          range.startContainer.nodeType === Node.ELEMENT_NODE
+            ? (range.startContainer as Element)
+            : range.startContainer.parentElement;
+        const listItem = startElement?.closest("li");
+        const specialTabContext = startElement?.closest(
+          "table, [data-type='code-block']",
+        );
+
+        if (listItem && hostEl.contains(listItem) && !specialTabContext) {
+          const action = e.shiftKey ? "outdent" : "indent";
+          const actionButton = hostEl.querySelector<HTMLButtonElement>(
+            `button[data-type="${action}"]`,
+          );
+          if (
+            actionButton &&
+            !actionButton.classList.contains("vditor-menu--disabled")
+          ) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            actionButton.click();
+            return;
+          }
+        }
+      }
 
       if (PAIR_MAP[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const selection = window.getSelection();
