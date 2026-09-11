@@ -9,6 +9,7 @@ import Vditor from "vditor";
 import "vditor/dist/index.css";
 import { uploadAsset } from "../../api/client";
 import { resolveMarkdownPreviewUrl } from "../../utils/preview-url";
+import { prepareMermaidForVditor } from "../../utils/mermaid-vditor";
 import type { EditorHandle } from "./EditorHandle";
 
 export type Theme = "light" | "dark";
@@ -82,6 +83,7 @@ export const VditorEditor = forwardRef<EditorHandle, VditorEditorProps>(
     let vditorInstance: Vditor | null = null;
     lastEmittedValueRef.current = value;
 
+    prepareMermaidForVditor();
     vditorInstance = new Vditor(hostId, {
       mode: "ir",
       height: "100%",
